@@ -280,6 +280,10 @@ const App = () => {
   const isFetchingRef = useRef(false);
   
   const touchStartRef = useRef<number | null>(null);
+  
+  // Tap detection refs
+  const lastTapRef = useRef(0);
+  const tapCountRef = useRef(0);
 
   const getApiKey = () => process.env.API_KEY || process.env.GEMINI_API_KEY;
 
@@ -598,6 +602,26 @@ const App = () => {
   // --- Interaction Handlers ---
 
   const handlePageTap = () => {
+    const now = Date.now();
+    const diff = now - lastTapRef.current;
+    
+    // De-bounce very fast double-invocations (e.g. touch + click overlap)
+    if (diff < 100) return;
+
+    if (diff < 500) {
+      tapCountRef.current += 1;
+    } else {
+      tapCountRef.current = 1;
+    }
+    lastTapRef.current = now;
+
+    if (tapCountRef.current >= 3) {
+       localStorage.removeItem('ulven_pages');
+       localStorage.removeItem('ulven_page_index');
+       window.location.reload();
+       return;
+    }
+
     if (isWaitingForInput && hiddenInputRef.current) {
       hiddenInputRef.current.focus();
     }
