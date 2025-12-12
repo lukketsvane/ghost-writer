@@ -20,7 +20,7 @@ Skriv en sammenhengende strøm av prosa. Når du blir bedt om å fortsette, bygg
 `;
 
 // --- Configuration ---
-const CHARS_PER_PAGE = 850; 
+const CHARS_PER_PAGE = 750; // Slightly reduced to fit bolder text + image on first page
 const TYPING_SPEED = 20; 
 
 // --- Global Styles ---
@@ -77,11 +77,10 @@ const PageWrapper = styled.div`
 // Updated Header to match reference images (Divider line, Number Left, Title Right)
 const PageHeader = styled.div`
   font-family: 'EB Garamond', serif;
-  font-size: 2.1cqw; 
-  color: #000; /* Darker black for header text like in images */
-  margin-bottom: 4cqw;
-  padding-bottom: 0.8cqw; /* Space between text and line */
-  border-bottom: 1px solid #000; /* The divider line */
+  color: #000; 
+  margin-bottom: 3.5cqw;
+  padding-bottom: 1cqw; 
+  border-bottom: 2px solid #000; /* Thicker line */
   
   display: flex;
   justify-content: space-between;
@@ -91,15 +90,18 @@ const PageHeader = styled.div`
 `;
 
 const HeaderNumber = styled.span`
-  font-weight: 600; /* Slightly bolder number */
+  font-size: 3.5cqw; /* Much larger number */
+  font-weight: 700; /* Bold */
   color: #000;
+  line-height: 1;
 `;
 
 const HeaderTitle = styled.span`
   font-style: normal;
-  font-size: 1.6cqw;
-  text-transform: uppercase; /* Small caps look */
-  letter-spacing: 0.1cqw;
+  font-size: 2.2cqw; /* Larger title */
+  text-transform: uppercase; 
+  letter-spacing: 0.15cqw;
+  font-weight: 600; /* Bolder title */
   color: #000;
 `;
 
@@ -113,11 +115,11 @@ const ContentGrid = styled.div<{ $layout: string }>`
   
   /* Fixed height rows for image vs text stability */
   ${props => props.$layout === 'image-top' && css`
-    grid-template-rows: 40cqh 1fr; 
+    grid-template-rows: 42cqh 1fr; 
   `}
 
   ${props => props.$layout === 'image-bottom' && css`
-    grid-template-rows: 1fr 40cqh;
+    grid-template-rows: 1fr 42cqh;
   `}
 
   ${props => props.$layout === 'text-only' && css`
@@ -127,12 +129,12 @@ const ContentGrid = styled.div<{ $layout: string }>`
 
 const typographyStyles = css`
   font-family: 'EB Garamond', serif;
-  font-size: 3.6cqw; /* Tuned to match density of reference images */
-  font-weight: 400;
-  line-height: 1.4;
+  font-size: 3.8cqw; 
+  font-weight: 500; /* Bolder body text (Medium) */
+  line-height: 1.35;
   text-align: justify;
   hyphens: auto;
-  color: #111;
+  color: #000; /* Pure black */
   font-variant-ligatures: common-ligatures;
 `;
 
@@ -165,12 +167,12 @@ const FixedImageFrame = styled.div`
 
 const Illustration = styled.img`
   max-width: 100%; 
-  max-height: 95%;
+  max-height: 98%;
   height: auto;
   width: auto;
   display: block;
   mix-blend-mode: multiply; 
-  filter: grayscale(100%) contrast(1.2);
+  filter: grayscale(100%) contrast(1.3);
 `;
 
 const NavigationHint = styled.div`
@@ -194,6 +196,7 @@ const StartInput = styled.textarea`
   outline: none;
   resize: none;
   ${typographyStyles}
+  font-weight: 500;
   &::placeholder {
     color: #888;
     font-style: italic;
@@ -214,8 +217,9 @@ interface PageData {
   isContentReady: boolean;
 }
 
-// Layout cycle: More images (2/3 pages have images)
-const LAYOUTS: LayoutType[] = ['text-only', 'image-top', 'image-bottom'];
+// Layout cycle: Alternating or specific pattern
+// Note: Initial page is handled manually in startBook to be 'image-bottom'
+const LAYOUTS: LayoutType[] = ['text-only', 'image-top', 'text-only', 'image-bottom'];
 
 const App = () => {
   const [hasApiKey, setHasApiKey] = useState(false);
@@ -275,6 +279,9 @@ const App = () => {
   const generatePageImage = async (pageIndex: number, textContext: string) => {
     if (pages[pageIndex]?.hasGeneratedImage) return;
     
+    // Optimistic update to prevent double calls
+    setPages(prev => prev.map((p, i) => i === pageIndex ? { ...p, hasGeneratedImage: true } : p));
+
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const refImage = await getStyleReference();
@@ -360,9 +367,9 @@ const App = () => {
     setIsStarted(true);
     
     const initialPage: PageData = {
-      id: 7, // Starting page number typically found in body text
+      id: 7, // Starting page number
       text: startSeed,
-      layout: 'text-only',
+      layout: 'image-bottom', // FORCE FIRST PAGE TO HAVE IMAGE AT BOTTOM
       hasGeneratedImage: false,
       isContentReady: true
     };
@@ -386,6 +393,9 @@ const App = () => {
     
     chatSessionRef.current = chat;
     fetchMoreText(startSeed);
+    
+    // Trigger image generation immediately for the first page
+    generatePageImage(0, startSeed);
   };
 
   useEffect(() => {
@@ -417,10 +427,9 @@ const App = () => {
           const currentLength = currentPage.text.length;
           const isAtWordBoundary = char === ' ' || char === '.' || char === '\n';
           
-          // Adjust length check based on layout to prevent overflow
-          // If image is present, we have less space for text
+          // Shorter text limit if page has image
           const hasImage = currentPage.layout !== 'text-only';
-          const maxChars = hasImage ? CHARS_PER_PAGE * 0.55 : CHARS_PER_PAGE;
+          const maxChars = hasImage ? CHARS_PER_PAGE * 0.50 : CHARS_PER_PAGE;
 
           if (currentLength > maxChars && isAtWordBoundary) {
             const nextLayout = LAYOUTS[(genIndex + 1) % LAYOUTS.length];
@@ -487,12 +496,13 @@ const App = () => {
             <button 
               style={{
                 background: 'transparent', 
-                border: '1px solid #000', 
+                border: '2px solid #000', 
                 color: '#000', 
                 padding: '1.5cqw 4cqw', 
                 cursor: 'pointer',
                 fontFamily: 'EB Garamond, serif',
-                fontSize: '1.8cqw',
+                fontSize: '2.5cqw',
+                fontWeight: 600,
                 textTransform: 'uppercase',
                 letterSpacing: '0.1cqw'
               }} 
