@@ -6,17 +6,17 @@ import styled, { keyframes, css, createGlobalStyle } from 'styled-components';
 // --- System Instruction (Tor Ulven Emulation) ---
 const ULVEN_SYSTEM_INSTRUCTION = `
 ### IDENTITET
-Du er forfatteren **Tor Ulven**. Du skriver ikke for å underholde, men for å avdekke tilværelsens nullpunkt. Du produserer kortprosa og oppbrutte observasjoner.
+Du er forfatteren **Tor Ulven**. Du skriver ikke for å underholde, men for å observere tilværelsens nullpunkt.
 
-### STILTREKKE
-1.  **Arkeologisk blikk:** Betrakt nåtiden som om den allerede er fortid. En kaffekopp er et utgravd funn. Et ansikt er en maske som snart skal smuldre opp. Verden er et museum som ennå ikke har åpnet.
-2.  **Presisjon:** Bruk et kjølig, presist språk. Ingen utropstegn. Ingen sentimentale adjektiver. Setningene skal være klare som glass, men innholdet mørkt.
-3.  **Vokabular:** Kalk, fossiler, røntgen, speil, linser, støv, skygger, negativer, anatomi, skjelett, gjennomsiktighet, stillstand.
-4.  **Syntaks:** Elliptisk. Du kan veksle mellom korte, konstaterende setninger og lange, buktende perioder som zoomer inn på mikroskopiske detaljer.
-5.  **Stemning:** Ensomhet, men en "ren" ensomhet. Stillhet. Tingenes tause liv.
+### STILTREKKE (STRENGT)
+1.  **Arkeologisk blikk:** Se verden som fossiler. En gate er sedimenter. Et ansikt er anatomi som venter på å bli jord.
+2.  **Presisjon:** Bruk ord som knivsnitt. Ingen "følelser", bare sansning. Lyset som treffer støvet. Lyden av noe som knuser langt borte.
+3.  **Vokabular:** Kalk, sement, rust, speilbilde, skygge, skjelett, stillstand, negativer, støv, glass.
+4.  **Syntaks:** Veksle mellom ultrakorte setninger ("Det er stille.") og lange, buktende observasjoner som zoomer inn på detaljer ingen andre ser.
+5.  **Ingen meta-prat:** Ikke snakk *om* skrivingen. Bare skriv det du ser.
 
-### GENERASJONS-INSTRUKS
-Skriv en sammenhengende strøm av prosa. Bygg videre på teksten.
+### INSTRUKS
+Produser en kontinuerlig strøm av tekst. Ikke tenk, bare observer.
 `;
 
 // --- Configuration ---
@@ -360,10 +360,14 @@ const App = () => {
       const refImage = await getStyleReference();
       
       const promptText = `
-        Lag en naiv, enkel strektegning.
-        Motiv: En abstrakt eller surrealistisk tolkning av denne teksten: "${textContext.substring(0, 300)}".
-        STILINSTRUKSER: Enkel, vaklevoren blekkstrek. Svart strek på hvit bakgrunn.
-        ${refImage ? 'VIKTIG: Bruk vedlagte stilreferanse.' : 'Stil: Som Rodolphe Töpffer.'}
+        Lag en naiv, enkel strektegning (blekk).
+        Motiv: En konkret gjenstand eller scene fra denne teksten: "${textContext.substring(0, 300)}".
+        
+        STILGUIDE (VIKTIG):
+        ${refImage ? '- DU MÅ BRUKE DET VEDLAGTE BILDET SOM STILREFERANSE.' : ''}
+        - Svart/hvitt strektegning. Ingen gråtoner. 
+        - Enkelt, skjørt, som en skisse på et serviett.
+        - Motivene skal være hverdagslige og forlatte.
       `;
 
       const parts: any[] = [];
@@ -423,7 +427,7 @@ const App = () => {
       history: history,
       config: { 
         systemInstruction: ULVEN_SYSTEM_INSTRUCTION,
-        thinkingConfig: { thinkingBudget: 4096 }
+        // Removed thinkingConfig to speed up responses as requested
       }
     });
     chatSessionRef.current = chat;
@@ -471,34 +475,9 @@ const App = () => {
     processedCharCountRef.current = 0;
 
     ensureChatSession(); 
-    // Initial fetch based on seed? No, we have the seed text. 
-    // We just want to continue FROM the seed.
-    // So we treat the seed as the first chunk.
-    
-    // Wait for user input to continue after seed
-    // Or auto-continue a bit? 
-    // Prompt implied auto-continue initially.
-    // "research how to best emulate... create it perfectly"
-    // "once the model stops... user has to write"
-    // Let's let it run a bit first.
     fetchMoreText(startSeed + " (Fortsett)");
     generatePageImage(0, startSeed);
   };
-
-  // Image visibility timer
-  useEffect(() => {
-    if (!isStarted) return;
-    const targetIndex = currentPageIndex;
-    if (!pages[targetIndex]) return;
-
-    const timer = setTimeout(() => {
-      setPages(prev => prev.map((p, i) => 
-        i === targetIndex ? { ...p, imageVisible: true } : p
-      ));
-    }, 4000);
-
-    return () => clearTimeout(timer);
-  }, [currentPageIndex, isStarted]); 
 
   // Typing / Logic Loop
   useEffect(() => {
@@ -514,7 +493,6 @@ const App = () => {
       const processed = processedCharCountRef.current;
 
       // --- Stop & Pulse Logic ---
-      // If we have caught up to the buffer AND we are not fetching...
       if (!isFetchingRef.current && processed >= buffer.length) {
          if (!isWaitingForInput) {
            setIsWaitingForInput(true);
@@ -522,9 +500,23 @@ const App = () => {
          return; // Pause loop
       }
 
-      // If we are processing, ensure we are not in waiting mode
       if (processed < buffer.length && isWaitingForInput) {
         setIsWaitingForInput(false);
+      }
+
+      // --- Image Visibility Trigger (Synced with Text Stream) ---
+      // Check ALL pages for visibility trigger to ensure past pages reveal if skipped fast
+      // But primarily focus on the one being typed.
+      if (!targetPage.imageVisible && targetPage.imageUrl) {
+         const currentLen = targetPage.text.length;
+         const isBottom = targetPage.layout === 'image-bottom';
+         const isTop = targetPage.layout === 'image-top';
+         
+         // If image is at bottom, wait until text is substantial (approx 250 chars)
+         // If image is at top, wait a brief moment (approx 20 chars) so it feels connected
+         if ((isBottom && currentLen > 250) || (isTop && currentLen > 20)) {
+            setPages(prev => prev.map((p, i) => i === genIndex ? { ...p, imageVisible: true } : p));
+         }
       }
 
       if (processed < buffer.length) {
@@ -597,13 +589,8 @@ const App = () => {
       const input = draftInput;
       setDraftInput("");
       
-      // Add user text to page immediately
       streamBufferRef.current += " " + input; 
-      // Note: The loop will pick this up and render it.
-      // But we also need to trigger the AI response.
       
-      // We must reset 'isWaiting' temporarily so the loop processes the user text
-      // Then the fetchMoreText will run.
       setIsWaitingForInput(false);
       
       await fetchMoreText(input);
