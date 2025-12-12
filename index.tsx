@@ -373,31 +373,46 @@ const App = () => {
         Lag en naiv, enkel strektegning (blekk).
         Motiv: En konkret gjenstand eller scene fra denne teksten: "${textContext.substring(0, 300)}".
         
-        STILGUIDE (VIKTIG):
-        ${refImage ? '- DU MÅ BRUKE DET VEDLAGTE BILDET SOM STILREFERANSE.' : ''}
+        STILGUIDE:
+        ${refImage ? '- Se på vedlagt bilde for stil.' : ''}
         - Svart/hvitt strektegning. Ingen gråtoner. 
         - Enkelt, skjørt, som en skisse på et serviett.
-        - Motivene skal være hverdagslige og forlatte.
+        - INGEN tekst.
       `;
 
       const parts: any[] = [];
       if (refImage) parts.push({ inlineData: { mimeType: 'image/jpeg', data: refImage }});
       parts.push({ text: promptText });
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: { parts: parts },
-        config: { imageConfig: { aspectRatio: "4:3" } }
-      });
-
       let base64 = null;
-      if (response.candidates?.[0]?.content?.parts) {
-        for (const part of response.candidates[0].content.parts) {
-          if (part.inlineData) {
-            base64 = part.inlineData.data;
-            break;
-          }
-        }
+
+      // Helper to extract image from response
+      const extractImage = (response: any) => {
+         if (response.candidates?.[0]?.content?.parts) {
+            for (const part of response.candidates[0].content.parts) {
+               if (part.inlineData) return part.inlineData.data;
+            }
+         }
+         return null;
+      };
+
+      try {
+         // Try Pro Model first (High Quality, follows "nano banana pro" request)
+         const response = await ai.models.generateContent({
+            model: 'gemini-3-pro-image-preview',
+            contents: { parts: parts },
+            config: { imageConfig: { aspectRatio: "4:3" } }
+         });
+         base64 = extractImage(response);
+      } catch (proError) {
+         console.warn("Pro model failed, falling back to Flash", proError);
+         // Fallback to Flash Model if Pro fails (e.g. key permissions, region)
+         const response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash-image',
+            contents: { parts: parts },
+            config: { imageConfig: { aspectRatio: "4:3" } }
+         });
+         base64 = extractImage(response);
       }
 
       if (base64) {
@@ -408,6 +423,7 @@ const App = () => {
          setPages(prev => prev.map((p, i) => i === pageIndex ? { ...p, isContentReady: true } : p));
       }
     } catch (e) {
+      console.error("Image generation fatal error", e);
       setPages(prev => prev.map((p, i) => i === pageIndex ? { ...p, isContentReady: true } : p));
     }
   };
@@ -559,12 +575,6 @@ const App = () => {
 
             generationPageIndexRef.current = genIndex + 1;
             
-            // NOTE: Auto-navigation disabled per request.
-            // User must swipe manually when text stops/fades.
-            // if (currentPageIndex === genIndex) {
-            //    setCurrentPageIndex(genIndex + 1);
-            // }
-
             if (nextLayout !== 'text-only') {
                generatePageImage(genIndex + 1, currentPage.text.slice(-300));
             }
