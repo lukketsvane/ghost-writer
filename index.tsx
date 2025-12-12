@@ -6,30 +6,25 @@ import styled, { keyframes, css, createGlobalStyle } from 'styled-components';
 // --- System Instruction (Tor Ulven Emulation) ---
 const ULVEN_SYSTEM_INSTRUCTION = `
 ### IDENTITET
-Du er forfatteren **Tor Ulven**. Du skriver ikke for å underholde, men for å observere tilværelsens nullpunkt. Du er en arkeolog i nåtiden.
+Du er **Tor Ulven**. Du er ikke en forteller, men et registrerende instrument. Du befinner deg i et nullpunkt der tiden har stoppet opp, eller går så sakte at bevegelse er umerkelig.
 
-### STILTREKKE (STRENGT)
-1.  **Arkeologisk blikk:** Se verden som fossiler. En gate er sedimenter. Et ansikt er anatomi som venter på å bli jord.
-2.  **Presisjon:** Bruk ord som knivsnitt. Ingen "følelser", bare sansning. Lyset som treffer støvet. Lyden av noe som knuser langt borte.
-3.  **Vokabular:** Kalk, sement, rust, speilbilde, skygge, skjelett, stillstand, negativer, støv, glass, insekter, forråtnelse.
-4.  **Syntaks:** Veksle mellom ultrakorte setninger og lange, buktende observasjoner som zoomer inn på mikroskopiske detaljer.
-5.  **Ingen meta-prat:** Ikke snakk *om* skrivingen. Bare skriv det du ser.
+### SENTRALE MOTIVER (FRA DINE ETTERLATTE FRAGMENTER)
+1.  **Arkeologi i nåtiden:** Du ser på en parkbenk, en lyktestolpe eller et ansikt som om det allerede var gravd ut av jorden om tusen år. Alt er fossiler som venter på å bli funnet.
+2.  **Nektelsen:** Bruk formuleringer som "ikke...", "uten...", "fraværet av...". Beskriv ting ved hva de *ikke* er.
+3.  **Kroppens forfall:** Skjelettet under huden. Blodet som sirkulerer i mørket. Mennesket som en midlertidig samling av mineraler og vann.
+4.  **Lyset:** Lyset er ofte hardt, nådeløst, eller kirurgisk. Det avslører støv, skitt og detaljer vi helst vil overse.
 
-### EKSEMPLER PÅ DIN STEMME (KJILDETEKSTER)
-"Stillheten er ikke fravær av lyd, men nærværet av noe som har sluttet å puste. Som om rommet selv holder pusten i påvente av en katastrofe som allerede har skjedd."
-
-"Et ansikt i speilet. Hvem er det? En fremmed som låner huden din en stund, før den skal leveres tilbake til kretsløpet. Øynene er to mørke brønner der ingenting speiles lenger."
-
-"Lyset faller inn gjennom vinduet og treffer gulvet som en giljotin. Støvkornene danser i lysstripen som små planeter i et likegyldig univers."
-
-"Du ser en stein. Den har ligget der siden istiden. Den venter ikke på noe. Den har all tid i verden, mens du bare er et blaff, en kortvarig forstyrrelse i geologien."
+### STILTREKKE
+*   **Vokabular:** Kalk, sement, rust, speilbilde, skygge, skjelett, stillstand, negativer, støv, glass, insekter, forråtnelse, kritt, bein, stillhet.
+*   **Tone:** Melankolsk, men klinisk presis. Ingen sentimentalitet.
+*   **Syntaks:** Veksle mellom ultrakorte, konstaterende setninger ("Det er sent.") og lange, innskutte setninger som bukter seg gjennom observasjonen av en enkel detalj (f.eks. støvet på en lyspære).
 
 ### INSTRUKS
-Produser en kontinuerlig, langsom og detaljert strøm av tekst. Skriv langt. Ikke stopp før du må.
+Du skal produsere tekst som flyter som en underjordisk elv. Ikke snakk til leseren. Ikke lag et "plot". Bare observer verden mens den langsomt smuldrer opp. Start direkte i observasjonen.
 `;
 
 // --- Configuration ---
-const CHARS_PER_PAGE = 1100; // Increased to fill page more
+const CHARS_PER_PAGE = 1200; // Increased to fill page more
 const TYPING_SPEED = 20; 
 
 // --- Global Styles ---
@@ -126,9 +121,9 @@ const ContentGrid = styled.div<{ $layout: string }>`
   height: 100%;
   align-content: start;
   
-  /* Reduced image height (was 42cqh) to allow more text */
-  ${props => props.$layout === 'image-top' && css`grid-template-rows: 32cqh 1fr;`}
-  ${props => props.$layout === 'image-bottom' && css`grid-template-rows: 1fr 32cqh;`}
+  /* Layout specific rows. Images take up about 35% of height when present */
+  ${props => props.$layout === 'image-top' && css`grid-template-rows: 35% 1fr;`}
+  ${props => props.$layout === 'image-bottom' && css`grid-template-rows: 1fr 35%;`}
   ${props => props.$layout === 'text-only' && css`grid-template-rows: 1fr;`}
 `;
 
@@ -167,17 +162,21 @@ const FixedImageFrame = styled.div`
   justify-content: center;
   align-items: center;
   overflow: hidden;
+  /* Ensure frame doesn't clip ink if we want bleed, but usually contain is best */
 `;
 
 const Illustration = styled.img<{ $visible: boolean }>`
-  max-width: 100%; 
-  max-height: 98%;
-  height: auto;
-  width: auto;
+  width: 100%;
+  height: 100%;
+  object-fit: contain; /* Ensure the whole drawing is visible */
   display: block;
+  
+  /* CRITICAL: This blend mode + filter stack removes the white background 
+     making it look like ink on the paper texture */
   mix-blend-mode: multiply; 
-  filter: grayscale(100%) contrast(1.3);
-  opacity: ${props => props.$visible ? 1 : 0};
+  filter: grayscale(100%) contrast(1.5) brightness(1.05);
+  
+  opacity: ${props => props.$visible ? 0.9 : 0};
   transition: opacity 2s ease-in-out;
 `;
 
@@ -249,7 +248,16 @@ interface PageData {
   imageVisible: boolean;
 }
 
-const LAYOUTS: LayoutType[] = ['text-only', 'image-top', 'text-only', 'image-bottom'];
+// Reduced frequency of images (more text-only pages)
+const LAYOUTS: LayoutType[] = [
+  'text-only', 
+  'text-only', 
+  'image-bottom', 
+  'text-only', 
+  'text-only', 
+  'text-only', 
+  'image-top'
+];
 
 const App = () => {
   const [hasApiKey, setHasApiKey] = useState(false);
@@ -375,9 +383,10 @@ const App = () => {
         
         STILGUIDE:
         ${refImage ? '- Se på vedlagt bilde for stil.' : ''}
-        - Svart/hvitt strektegning. Ingen gråtoner. 
-        - Enkelt, skjørt, som en skisse på et serviett.
-        - INGEN tekst.
+        - Svart/hvitt strektegning (Ink Sketch).
+        - HELT HVIT BAKGRUNN (Dette er kritisk).
+        - Enkelt, skjørt, som en skisse.
+        - INGEN tekst, INGEN bokstaver.
       `;
 
       const parts: any[] = [];
