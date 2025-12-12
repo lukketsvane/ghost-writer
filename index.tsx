@@ -16,11 +16,11 @@ Du er forfatteren **Tor Ulven**. Du skriver ikke for å underholde, men for å a
 5.  **Stemning:** Ensomhet, men en "ren" ensomhet. Stillhet. Tingenes tause liv.
 
 ### GENERASJONS-INSTRUKS
-Skriv en sammenhengende strøm av prosa. Når du blir bedt om å fortsette, bygg videre på stemningen uten brudd. Ikke repeter deg selv.
+Skriv en sammenhengende strøm av prosa. Bygg videre på teksten.
 `;
 
 // --- Configuration ---
-const CHARS_PER_PAGE = 750; // Slightly reduced to fit bolder text + image on first page
+const CHARS_PER_PAGE = 750; 
 const TYPING_SPEED = 20; 
 
 // --- Global Styles ---
@@ -32,8 +32,17 @@ const GlobalStyle = createGlobalStyle`
     color: #000;
     font-family: 'EB Garamond', serif;
     overflow: hidden;
-    touch-action: pan-y;
+    touch-action: none; /* Prevent scroll on PWA */
+    user-select: none;
+    -webkit-user-select: none;
   }
+`;
+
+// --- Animations ---
+const pulse = keyframes`
+  0% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(0.85); }
+  100% { opacity: 1; transform: scale(1); }
 `;
 
 // --- Styled Components ---
@@ -49,13 +58,11 @@ const AppContainer = styled.div`
 `;
 
 const PageWrapper = styled.div`
-  /* Standard Trade Book Ratio (2:3) */
   aspect-ratio: 2 / 3;
-  /* Fit to screen */
   height: min(92vh, calc(92vw * (3 / 2)));
   width: min(92vw, calc(92vh * (2 / 3)));
   
-  background-color: #fcfbf9; /* Off-white book paper */
+  background-color: #fcfbf9;
   box-shadow: 
     0 1px 1px rgba(0,0,0,0.15), 
     0 10px 0 -5px #e0e0e0, 
@@ -70,17 +77,15 @@ const PageWrapper = styled.div`
   
   display: flex;
   flex-direction: column;
-  /* Academic margins: wider bottom margin */
   padding: 6cqw 8cqw 10cqw 8cqw; 
 `;
 
-// Updated Header to match reference images (Divider line, Number Left, Title Right)
 const PageHeader = styled.div`
   font-family: 'EB Garamond', serif;
   color: #000; 
   margin-bottom: 3.5cqw;
   padding-bottom: 1cqw; 
-  border-bottom: 2px solid #000; /* Thicker line */
+  border-bottom: 2px solid #000;
   
   display: flex;
   justify-content: space-between;
@@ -90,22 +95,21 @@ const PageHeader = styled.div`
 `;
 
 const HeaderNumber = styled.span`
-  font-size: 3.5cqw; /* Much larger number */
-  font-weight: 700; /* Bold */
+  font-size: 3.5cqw;
+  font-weight: 700;
   color: #000;
   line-height: 1;
 `;
 
 const HeaderTitle = styled.span`
   font-style: normal;
-  font-size: 2.2cqw; /* Larger title */
+  font-size: 2.2cqw;
   text-transform: uppercase; 
   letter-spacing: 0.15cqw;
-  font-weight: 600; /* Bolder title */
+  font-weight: 600;
   color: #000;
 `;
 
-// Grid layout with fixed slots
 const ContentGrid = styled.div<{ $layout: string }>`
   display: grid;
   flex: 1;
@@ -113,35 +117,26 @@ const ContentGrid = styled.div<{ $layout: string }>`
   height: 100%;
   align-content: start;
   
-  /* Fixed height rows for image vs text stability */
-  ${props => props.$layout === 'image-top' && css`
-    grid-template-rows: 42cqh 1fr; 
-  `}
-
-  ${props => props.$layout === 'image-bottom' && css`
-    grid-template-rows: 1fr 42cqh;
-  `}
-
-  ${props => props.$layout === 'text-only' && css`
-    grid-template-rows: 1fr;
-  `}
+  ${props => props.$layout === 'image-top' && css`grid-template-rows: 42cqh 1fr;`}
+  ${props => props.$layout === 'image-bottom' && css`grid-template-rows: 1fr 42cqh;`}
+  ${props => props.$layout === 'text-only' && css`grid-template-rows: 1fr;`}
 `;
 
 const typographyStyles = css`
   font-family: 'EB Garamond', serif;
   font-size: 3.8cqw; 
-  font-weight: 500; /* Bolder body text (Medium) */
+  font-weight: 500;
   line-height: 1.35;
   text-align: justify;
   hyphens: auto;
-  color: #000; /* Pure black */
+  color: #000;
   font-variant-ligatures: common-ligatures;
 `;
 
 const TextBody = styled.div`
   ${typographyStyles}
   white-space: pre-wrap;
-  overflow: hidden; /* Ensure text doesn't spill out of its grid cell */
+  overflow: hidden;
   
   p { 
     margin-bottom: 0; 
@@ -154,7 +149,6 @@ const TextBody = styled.div`
   }
 `;
 
-// Fixed frame for images to simulate typesetting layout
 const FixedImageFrame = styled.div`
   width: 100%;
   height: 100%;
@@ -206,6 +200,31 @@ const StartInput = styled.textarea`
   }
 `;
 
+// Pulsing period / cursor
+const PulsingPeriod = styled.span`
+  display: inline-block;
+  font-weight: 900;
+  color: #000;
+  animation: ${pulse} 1.5s infinite ease-in-out;
+  cursor: text;
+`;
+
+const UserInputSpan = styled.span`
+  color: #333;
+  /* text-decoration: underline; */ /* Optional: distinguish user text */
+`;
+
+// Hidden input to capture mobile keyboard
+const HiddenInput = styled.textarea`
+  position: absolute;
+  opacity: 0;
+  top: 0;
+  left: 0;
+  height: 1px;
+  width: 1px;
+  pointer-events: none; /* We programmatically focus it */
+`;
+
 // --- Logic ---
 
 type LayoutType = 'text-only' | 'image-top' | 'image-bottom';
@@ -220,19 +239,21 @@ interface PageData {
   imageVisible: boolean;
 }
 
-// Layout cycle: Alternating or specific pattern
-// Note: Initial page is handled manually in startBook to be 'image-bottom'
 const LAYOUTS: LayoutType[] = ['text-only', 'image-top', 'text-only', 'image-bottom'];
 
 const App = () => {
   const [hasApiKey, setHasApiKey] = useState(false);
-  // Tor Ulven inspired seed
-  const [startSeed, setStartSeed] = useState("Det er ingenting her, bare støvet som danser i lysstripen fra vinduet, som mikroskopiske planeter i et univers som ikke vet om oss.");
+  const [startSeed, setStartSeed] = useState("");
   
   const [pages, setPages] = useState<PageData[]>([]);
   const [isStarted, setIsStarted] = useState(false);
   
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
+
+  // Interaction States
+  const [isWaitingForInput, setIsWaitingForInput] = useState(false);
+  const [draftInput, setDraftInput] = useState("");
+  const hiddenInputRef = useRef<HTMLTextAreaElement>(null);
 
   // Refs
   const chatSessionRef = useRef<Chat | null>(null);
@@ -242,28 +263,64 @@ const App = () => {
   const isFetchingRef = useRef(false);
   
   const touchStartRef = useRef<number | null>(null);
-  const [tick, setTick] = useState(0);
 
-  // Helper to get key from environment or prototype
-  const getApiKey = () => {
-    return process.env.API_KEY || process.env.GEMINI_API_KEY;
-  };
+  const getApiKey = () => process.env.API_KEY || process.env.GEMINI_API_KEY;
+
+  // --- Persistence & Init ---
 
   useEffect(() => {
     const checkKey = async () => {
-      // 1. Check environment variable (Production/Vercel)
       if (getApiKey()) {
         setHasApiKey(true);
         return;
       }
-      
-      // 2. Check AI Studio prototype wrapper
       if (window.aistudio && await window.aistudio.hasSelectedApiKey()) {
         setHasApiKey(true);
       }
     };
     checkKey();
   }, []);
+
+  // Load from cache on mount
+  useEffect(() => {
+    const cachedPages = localStorage.getItem('ulven_pages');
+    const cachedIndex = localStorage.getItem('ulven_page_index');
+    
+    if (cachedPages) {
+      try {
+        const parsedPages = JSON.parse(cachedPages);
+        setPages(parsedPages);
+        setIsStarted(true);
+        
+        // Restore index
+        if (cachedIndex) {
+          const idx = parseInt(cachedIndex, 10);
+          setCurrentPageIndex(isNaN(idx) ? 0 : idx);
+        }
+        
+        // Restore generation state (assume finished fetching for cached content)
+        // Set pointers to the end of cached text
+        let totalText = "";
+        parsedPages.forEach((p: PageData) => totalText += p.text);
+        streamBufferRef.current = totalText;
+        processedCharCountRef.current = totalText.length;
+        generationPageIndexRef.current = parsedPages.length - 1;
+
+        // Force into input mode if we just loaded
+        setIsWaitingForInput(true);
+      } catch (e) {
+        console.error("Cache load error", e);
+      }
+    }
+  }, []);
+
+  // Save to cache on change
+  useEffect(() => {
+    if (pages.length > 0) {
+      localStorage.setItem('ulven_pages', JSON.stringify(pages));
+    }
+    localStorage.setItem('ulven_page_index', currentPageIndex.toString());
+  }, [pages, currentPageIndex]);
 
   const handleSelectKey = async () => {
     if (window.aistudio) {
@@ -286,7 +343,6 @@ const App = () => {
             reader.readAsDataURL(blob);
         });
     } catch (e) {
-        console.log("No style reference found (style.jpg)");
         return null;
     }
   };
@@ -294,83 +350,93 @@ const App = () => {
   const generatePageImage = async (pageIndex: number, textContext: string) => {
     if (pages[pageIndex]?.hasGeneratedImage) return;
     
-    // Optimistic update to prevent double calls
     setPages(prev => prev.map((p, i) => i === pageIndex ? { ...p, hasGeneratedImage: true } : p));
 
     try {
       const apiKey = getApiKey();
-      // Ensure we have a key before calling
-      if (!apiKey && (!window.aistudio || !await window.aistudio.hasSelectedApiKey())) {
-          console.error("No API Key available");
-          return;
-      }
+      if (!apiKey && (!window.aistudio || !await window.aistudio.hasSelectedApiKey())) return;
       
       const ai = new GoogleGenAI({ apiKey: apiKey || "" });
-      
       const refImage = await getStyleReference();
       
       const promptText = `
         Lag en naiv, enkel strektegning.
         Motiv: En abstrakt eller surrealistisk tolkning av denne teksten: "${textContext.substring(0, 300)}".
-        
-        STILINSTRUKSER:
-        - Enkel, vaklevoren blekkstrek.
-        - Svart strek på hvit bakgrunn.
-        - INGEN farger eller gråtoner.
-        - Minimalistisk.
-        ${refImage ? 'VIKTIG: Bruk det vedlagte bildet som STILREFERANSE for strekføring og estetikk.' : 'Stil: Som Rodolphe Töpffer.'}
+        STILINSTRUKSER: Enkel, vaklevoren blekkstrek. Svart strek på hvit bakgrunn.
+        ${refImage ? 'VIKTIG: Bruk vedlagte stilreferanse.' : 'Stil: Som Rodolphe Töpffer.'}
       `;
 
       const parts: any[] = [];
-      if (refImage) {
-          parts.push({ inlineData: { mimeType: 'image/jpeg', data: refImage }});
-      }
+      if (refImage) parts.push({ inlineData: { mimeType: 'image/jpeg', data: refImage }});
       parts.push({ text: promptText });
 
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
         contents: { parts: parts },
-        config: { 
-          imageConfig: { aspectRatio: "4:3" }
-        }
+        config: { imageConfig: { aspectRatio: "4:3" } }
       });
 
       let base64 = null;
       if (response.candidates?.[0]?.content?.parts) {
-          for (const part of response.candidates[0].content.parts) {
-              if (part.inlineData) {
-                  base64 = part.inlineData.data;
-                  break;
-              }
+        for (const part of response.candidates[0].content.parts) {
+          if (part.inlineData) {
+            base64 = part.inlineData.data;
+            break;
           }
+        }
       }
 
       if (base64) {
         setPages(prev => prev.map((p, i) => 
-          i === pageIndex 
-            ? { 
-                ...p, 
-                imageUrl: `data:image/png;base64,${base64}`, 
-                hasGeneratedImage: true,
-                isContentReady: true
-              } 
-            : p
+          i === pageIndex ? { ...p, imageUrl: `data:image/png;base64,${base64}`, isContentReady: true } : p
         ));
       } else {
          setPages(prev => prev.map((p, i) => i === pageIndex ? { ...p, isContentReady: true } : p));
       }
     } catch (e) {
-      console.error("Image gen failed:", e);
       setPages(prev => prev.map((p, i) => i === pageIndex ? { ...p, isContentReady: true } : p));
     }
   };
 
+  const ensureChatSession = () => {
+    if (chatSessionRef.current) return chatSessionRef.current;
+
+    const apiKey = getApiKey();
+    const ai = new GoogleGenAI({ apiKey: apiKey || "" });
+    
+    // If we are recovering from a reload, try to give context
+    let history = [];
+    if (pages.length > 0) {
+      // Reconstruct simple history: Model said everything so far.
+      // Limits context window usage by just taking last ~2000 chars if huge
+      const fullText = pages.map(p => p.text).join(" ");
+      const contextText = fullText.slice(-3000); 
+      
+      history = [
+         { role: 'user', parts: [{ text: "Start historien." }] },
+         { role: 'model', parts: [{ text: contextText }] }
+      ];
+    }
+
+    const chat = ai.chats.create({
+      model: 'gemini-3-pro-preview',
+      history: history,
+      config: { 
+        systemInstruction: ULVEN_SYSTEM_INSTRUCTION,
+        thinkingConfig: { thinkingBudget: 4096 }
+      }
+    });
+    chatSessionRef.current = chat;
+    return chat;
+  };
+
   const fetchMoreText = async (promptText: string) => {
-    if (isFetchingRef.current || !chatSessionRef.current) return;
+    if (isFetchingRef.current) return;
     
     isFetchingRef.current = true;
     try {
-      const resp = await chatSessionRef.current.sendMessageStream({ message: promptText });
+      const chat = ensureChatSession();
+      const resp = await chat.sendMessageStream({ message: promptText });
       
       for await (const chunk of resp) {
         const txt = chunk.text;
@@ -390,46 +456,41 @@ const App = () => {
     setIsStarted(true);
     
     const initialPage: PageData = {
-      id: 7, // Starting page number
+      id: 7,
       text: startSeed,
-      layout: 'image-bottom', // FORCE FIRST PAGE TO HAVE IMAGE AT BOTTOM
+      layout: 'image-bottom',
       hasGeneratedImage: false,
       isContentReady: true,
-      imageVisible: false // Initially hidden
+      imageVisible: false 
     };
     
     setPages([initialPage]);
     setCurrentPageIndex(0);
     generationPageIndexRef.current = 0;
-    
     streamBufferRef.current = " "; 
     processedCharCountRef.current = 0;
 
-    const apiKey = getApiKey();
-    const ai = new GoogleGenAI({ apiKey: apiKey || "" });
+    ensureChatSession(); 
+    // Initial fetch based on seed? No, we have the seed text. 
+    // We just want to continue FROM the seed.
+    // So we treat the seed as the first chunk.
     
-    const chat = ai.chats.create({
-      model: 'gemini-3-pro-preview',
-      config: { 
-        systemInstruction: ULVEN_SYSTEM_INSTRUCTION,
-        thinkingConfig: { thinkingBudget: 4096 }
-      }
-    });
-    
-    chatSessionRef.current = chat;
-    fetchMoreText(startSeed);
-    
-    // Trigger image generation immediately for the first page
+    // Wait for user input to continue after seed
+    // Or auto-continue a bit? 
+    // Prompt implied auto-continue initially.
+    // "research how to best emulate... create it perfectly"
+    // "once the model stops... user has to write"
+    // Let's let it run a bit first.
+    fetchMoreText(startSeed + " (Fortsett)");
     generatePageImage(0, startSeed);
   };
 
-  // Visibility Timer Effect: Reveal image 4s after page becomes active
+  // Image visibility timer
   useEffect(() => {
     if (!isStarted) return;
     const targetIndex = currentPageIndex;
     if (!pages[targetIndex]) return;
 
-    // Trigger reveal after 4 seconds of "reading" the page
     const timer = setTimeout(() => {
       setPages(prev => prev.map((p, i) => 
         i === targetIndex ? { ...p, imageVisible: true } : p
@@ -439,6 +500,7 @@ const App = () => {
     return () => clearTimeout(timer);
   }, [currentPageIndex, isStarted]); 
 
+  // Typing / Logic Loop
   useEffect(() => {
     if (!isStarted) return;
 
@@ -446,13 +508,23 @@ const App = () => {
       const genIndex = generationPageIndexRef.current;
       const targetPage = pages[genIndex];
 
-      if (!targetPage || !targetPage.isContentReady) return; 
+      if (!targetPage) return; 
 
       const buffer = streamBufferRef.current;
       const processed = processedCharCountRef.current;
 
-      if (!isFetchingRef.current && (buffer.length - processed) < 300) {
-        fetchMoreText("Fortsett.");
+      // --- Stop & Pulse Logic ---
+      // If we have caught up to the buffer AND we are not fetching...
+      if (!isFetchingRef.current && processed >= buffer.length) {
+         if (!isWaitingForInput) {
+           setIsWaitingForInput(true);
+         }
+         return; // Pause loop
+      }
+
+      // If we are processing, ensure we are not in waiting mode
+      if (processed < buffer.length && isWaitingForInput) {
+        setIsWaitingForInput(false);
       }
 
       if (processed < buffer.length) {
@@ -468,7 +540,6 @@ const App = () => {
           const currentLength = currentPage.text.length;
           const isAtWordBoundary = char === ' ' || char === '.' || char === '\n';
           
-          // Shorter text limit if page has image
           const hasImage = currentPage.layout !== 'text-only';
           const maxChars = hasImage ? CHARS_PER_PAGE * 0.50 : CHARS_PER_PAGE;
 
@@ -484,11 +555,12 @@ const App = () => {
               layout: nextLayout,
               hasGeneratedImage: false,
               isContentReady: isNextPageReady,
-              imageVisible: false // Hidden by default on new page
+              imageVisible: false 
             });
 
             generationPageIndexRef.current = genIndex + 1;
             
+            // Auto-advance if reader is at the end
             if (currentPageIndex === genIndex) {
                setCurrentPageIndex(genIndex + 1);
             }
@@ -499,12 +571,46 @@ const App = () => {
           }
           return newPages;
         });
-        setTick(t => t + 1);
       } 
     }, TYPING_SPEED);
 
     return () => clearInterval(interval);
-  }, [isStarted, currentPageIndex, pages]); 
+  }, [isStarted, currentPageIndex, pages, isWaitingForInput]); 
+
+  // --- Interaction Handlers ---
+
+  const handlePageTap = () => {
+    if (isWaitingForInput && hiddenInputRef.current) {
+      hiddenInputRef.current.focus();
+    }
+  };
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setDraftInput(e.target.value);
+  };
+
+  const handleInputSubmit = async (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (!draftInput.trim()) return;
+
+      const input = draftInput;
+      setDraftInput("");
+      
+      // Add user text to page immediately
+      streamBufferRef.current += " " + input; 
+      // Note: The loop will pick this up and render it.
+      // But we also need to trigger the AI response.
+      
+      // We must reset 'isWaiting' temporarily so the loop processes the user text
+      // Then the fetchMoreText will run.
+      setIsWaitingForInput(false);
+      
+      await fetchMoreText(input);
+    }
+  };
+
+  // --- Touch Navigation ---
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartRef.current = e.touches[0].clientX;
@@ -515,14 +621,16 @@ const App = () => {
     const touchEnd = e.changedTouches[0].clientX;
     const diff = touchStartRef.current - touchEnd;
 
-    if (diff > 50 && currentPageIndex < pages.length - 1) {
-      setCurrentPageIndex(prev => prev + 1);
+    if (Math.abs(diff) < 10) {
+      handlePageTap(); // Treat as tap
+    } else {
+      if (diff > 50 && currentPageIndex < pages.length - 1) {
+        setCurrentPageIndex(prev => prev + 1);
+      }
+      if (diff < -50 && currentPageIndex > 0) {
+        setCurrentPageIndex(prev => prev - 1);
+      }
     }
-    
-    if (diff < -50 && currentPageIndex > 0) {
-      setCurrentPageIndex(prev => prev - 1);
-    }
-    
     touchStartRef.current = null;
   };
 
@@ -558,7 +666,7 @@ const App = () => {
     );
   }
 
-  if (pages.length === 0) {
+  if (!isStarted && pages.length === 0) {
     return (
       <AppContainer>
         <PageWrapper>
@@ -566,7 +674,6 @@ const App = () => {
             <HeaderNumber>7</HeaderNumber>
             <HeaderTitle>Etterlatte fragmenter</HeaderTitle>
           </PageHeader>
-          
           <div style={{flex: 1, display: 'flex', flexDirection: 'column'}}>
             <StartInput 
               value={startSeed} 
@@ -594,16 +701,23 @@ const App = () => {
       <AppContainer 
         onTouchStart={handleTouchStart} 
         onTouchEnd={handleTouchEnd}
+        onClick={handlePageTap}
       >
+        <HiddenInput 
+          ref={hiddenInputRef}
+          value={draftInput}
+          onChange={handleInputChange}
+          onKeyDown={handleInputSubmit}
+          autoComplete="off"
+        />
+
         <PageWrapper>
           <PageHeader>
-            {/* Strict Header: Number Left, Title Right as per images */}
             <HeaderNumber>{activePage.id}</HeaderNumber>
             <HeaderTitle>Stein og Speil</HeaderTitle>
           </PageHeader>
 
           <ContentGrid $layout={activePage.layout}>
-            {/* Top Image Slot */}
             {activePage.layout === 'image-top' && (
                <FixedImageFrame>
                  {activePage.imageUrl && (
@@ -612,12 +726,17 @@ const App = () => {
                </FixedImageFrame>
             )}
 
-            {/* Text Slot */}
             <TextBody>
                 {activePage.text}
+                {/* Render draft input if we are on the active page and waiting */}
+                {isWaitingForInput && currentPageIndex === pages.length - 1 && (
+                  <>
+                    <UserInputSpan>{draftInput}</UserInputSpan>
+                    <PulsingPeriod>{draftInput.length > 0 ? '' : '.'}</PulsingPeriod>
+                  </>
+                )}
             </TextBody>
 
-            {/* Bottom Image Slot */}
             {activePage.layout === 'image-bottom' && (
                 <FixedImageFrame>
                    {activePage.imageUrl && (

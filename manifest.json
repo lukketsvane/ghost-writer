@@ -1,0 +1,16 @@
+{
+  "name": "Stein og Speil",
+  "short_name": "Ulven",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a1a1a",
+  "theme_color": "#1a1a1a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://www.gstatic.com/images/branding/product/2x/googleg_64dp.png",
+      "sizes": "128x128",
+      "type": "image/png"
+    }
+  ]
+}
