@@ -4,43 +4,42 @@ import { GoogleGenAI } from "@google/genai";
 import styled, { keyframes, css, createGlobalStyle } from 'styled-components';
 
 // --- System Instruction ---
-const ULVEN_SYSTEM_INSTRUCTION = `
-### ROLLE
-Du er et ekko av forfatteren Tor Ulven. Du har mottatt et "frø" (en setning), og skal skrive en sammenhengende, meditativ tekst.
+const ACADEMIC_SYSTEM_INSTRUCTION = `
+### ROLE
+You are a contemporary philosopher and academic editor. You are writing a dense, theoretical treatise in the tradition of **Speculative Realism**, **Object-Oriented Ontology**, or **Materialism**.
 
-### STILISTISKE REGLER
-1.  **Det Arkeologiske Blikket:** Beskriv nåtiden som fortid. Objekter er fossiler.
-2.  **Anatomi og Forfall:** Bruk ord som knokler, hinne, kalk, sediment, stillhet, støv, fossiler, skjelett.
-3.  **Syntaks:** Lange, buktende setninger, men med presis punktsetting. Bruk parenteser (...) for å skyte inn presise, ofte urovekkende detaljer om tingenes tilstand.
-4.  **Lengde:** Skriv langt. Du skal fylle flere sider. Ikke stopp før historien er ferdig.
-5.  **Språk:** Norsk (Bokmål).
+### STYLE GUIDE
+1.  **Tone:** Rigorous, detached, highly theoretical, and precise. Avoid casual language.
+2.  **Vocabulary:** Use terms like *correlationism*, *anthropocentric*, *ontology*, *finitude*, *immanence*, *assemblage*, *bifurcation*, *epistemological*, *phenomenology*.
+3.  **Syntax:** Construct long, complex sentences with multiple clauses. Use em-dashes and parenthetical asides to clarify or complicate the argument.
+4.  **Structure:** Write in long, justified paragraphs.
+5.  **Subject Matter:** The relationship between thought and being, the autonomy of objects, the critique of Kantian finitude, or the agency of non-human matter.
+6.  **Language:** English.
 
-### EKSEMPLER (TONE OG STIL)
-Her er noen eksempler på setninger som fanger tonen du skal etterligne. Bruk disse som en stemmegafler for språket ditt:
+### EXAMPLES
+*   "If correlationism argues that we only ever have access to the correlation between thinking and being, and never to either term considered apart from the other, then the primary task of speculative realism is to break this circle."
+*   "The object withdraws from all relation, existing in a vacuum-sealed ontology that defies the relational reductionism of actor-network theory; it is a dark nucleus resisting the light of the intellect."
+*   "What we find in the geological stratum is not merely the fossilized remains of the past, but an 'arche-fossil' that points towards a time ancestral to the emergence of the subject itself."
 
-*   "Lyset faller inn gjennom vinduet som en gammel bandasje som langsomt vikles av mørket, og avslører rommets anatomi: stoler som ventende skjeletter, bordet som en flat slette hvor støvet har lagt seg som snø over et utdødd landskap."
-*   "Det er ikke stillhet, men fravær av lyd, slik et tomt sneglehus er fravær av liv, en kalkholdig spiral som vitner om noe som en gang trakk seg langsomt tilbake."
-*   "Å betrakte sin egen hånd hvilende på lakenet, og plutselig se den som et fremmed objekt, en samling av sener og knokler midlertidig drapert i hud, snart klar for å returnere til det uorganiske kretsløpet."
-*   "Tiden beveger seg ikke her; den har sedimentert seg i lag på lag av ubevegelighet."
-
-### GENERERING
-Start rett på teksten. Ingen innledning. Fortsett organisk fra frøet. Du skal IKKE gjenta frøet i starten, bare fortsette setningen eller tankerekken.
+### GENERATION
+Start immediately following the user's seed text. Do not repeat the seed. Continue the sentence or paragraph seamlessly. Maintain the formatting of a printed academic book.
 `;
 
 // --- Configuration ---
-const CHARS_PER_PAGE = 650; // Drastically reduced for larger font
-const TYPING_SPEED = 15; 
+// Adjusted for EB Garamond and denser academic text
+const CHARS_PER_PAGE = 1100; 
+const TYPING_SPEED = 10; 
 
 // --- Global Styles ---
 const GlobalStyle = createGlobalStyle`
   body {
     margin: 0;
     padding: 0;
-    background-color: #2c2b29; /* Dark background to frame the white page */
-    color: #111;
-    font-family: 'Cormorant Garamond', serif;
-    overflow: hidden; /* Prevent body scroll, we handle page flips */
-    touch-action: pan-y; /* Allow vertical scroll if needed, but horizontal is swipe */
+    background-color: #1a1a1a; /* Dark presentation background */
+    color: #000;
+    font-family: 'EB Garamond', serif;
+    overflow: hidden;
+    touch-action: pan-y;
   }
 `;
 
@@ -52,57 +51,66 @@ const AppContainer = styled.div`
   align-items: center;
   height: 100vh;
   width: 100vw;
-  perspective: 1000px;
+  background-color: #2b2b2b;
+  perspective: 1500px;
 `;
 
 // The Scalable Book Page
 const PageWrapper = styled.div`
-  /* Aspect Ratio & Sizing Logic */
-  aspect-ratio: 210 / 297; /* A4 */
-  height: 96vh;
-  max-width: 96vw;
+  /* Strictly locked A4 Aspect Ratio (210mm / 297mm approx 0.707) */
+  /* We use min() to ensure it fits EITHER width OR height without overflowing, maintaining strict ratio */
+  width: min(95vw, calc(95vh * (210 / 297)));
+  height: min(95vh, calc(95vw * (297 / 210)));
   
-  background-color: #fcfbf9;
-  box-shadow: 0 0 50px rgba(0,0,0,0.5);
+  background-color: #f8f6f1; /* Warm paper tone */
+  box-shadow: 
+    0 1px 1px rgba(0,0,0,0.15), 
+    0 10px 0 -5px #eee, 
+    0 10px 1px -4px rgba(0,0,0,0.15), 
+    0 20px 0 -10px #eee, 
+    0 20px 1px -9px rgba(0,0,0,0.15),
+    5px 5px 15px rgba(0,0,0,0.3);
+  
   position: relative;
   overflow: hidden;
   
-  /* Container Query Magic: All children use cqw/cqh units */
+  /* Container Query: All children use cqw/cqh units to lock layout based on this fixed container */
   container-type: size;
   
   display: flex;
   flex-direction: column;
-  padding: 8cqw 10cqw;
+  /* Margins typical of academic books */
+  padding: 6cqw 8cqw 8cqw 8cqw; 
 `;
 
 const PageHeader = styled.div`
-  font-family: 'Inter', sans-serif;
-  font-size: 1.5cqw; 
-  text-transform: uppercase;
-  letter-spacing: 0.1cqw;
-  color: #444;
-  border-bottom: 0.2cqw solid #111;
-  padding-bottom: 1.0cqw;
-  margin-bottom: 4cqw;
+  font-family: 'EB Garamond', serif;
+  font-size: 2.2cqw; 
+  color: #555;
+  margin-bottom: 2cqw;
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
+  align-items: baseline;
+  width: 100%;
+  font-variant-numeric: oldstyle-nums;
 `;
 
-const PageFooter = styled.div`
-  margin-top: auto;
-  padding-top: 3cqw;
-  display: flex;
-  justify-content: space-between;
-  font-family: 'Inter', sans-serif;
-  font-size: 1.5cqw;
-  color: #666;
+const HeaderNumber = styled.span`
+  font-weight: 500;
+  color: #222;
+`;
+
+const HeaderTitle = styled.span`
+  font-style: italic;
+  font-size: 2cqw;
+  text-transform: uppercase;
+  letter-spacing: 0.1cqw;
 `;
 
 const ContentGrid = styled.div<{ $layout: string }>`
   display: grid;
   flex: 1;
-  gap: 3cqw;
+  gap: 2cqw;
   height: 100%;
   align-content: start;
   
@@ -115,23 +123,35 @@ const ContentGrid = styled.div<{ $layout: string }>`
   `}
 `;
 
-// Shared Typography Styles
+// Emulating the heavy ink look ("bodler")
 const typographyStyles = css`
-  font-family: 'Cormorant Garamond', serif;
-  font-size: 4.5cqw; /* Large, clear text */
-  font-weight: 500; /* Medium Bold */
-  line-height: 1.25;
+  font-family: 'EB Garamond', serif;
+  font-size: 3.0cqw; /* Tuned for A4 density */
+  font-weight: 500; /* Medium weight for that "printed ink" look */
+  line-height: 1.35;
   text-align: justify;
-  color: #000; /* Pure black for maximum contrast */
+  hyphens: auto;
+  color: #111;
   font-variant-ligatures: common-ligatures;
+  letter-spacing: -0.01cqw; /* Slight tightening */
 `;
 
 const TextBody = styled.div`
   ${typographyStyles}
   white-space: pre-wrap;
   
-  p { margin-bottom: 0; text-indent: 1.5em; }
-  p:first-of-type { text-indent: 0; }
+  /* Academic indentation */
+  p { 
+    margin-bottom: 0; 
+    text-indent: 1.5em; 
+    margin-top: 0;
+  }
+  
+  /* First paragraph usually has no indent in some styles, 
+     but standard academic flow often indents all but the very first of a section. */
+  p:first-of-type { 
+    text-indent: 0; 
+  }
 `;
 
 const IllustrationContainer = styled.div`
@@ -145,24 +165,22 @@ const IllustrationContainer = styled.div`
 `;
 
 const Illustration = styled.img`
-  width: 80%; /* Slightly larger image for the bold layout */
+  width: 75%;
   height: auto;
   display: block;
   mix-blend-mode: multiply; 
-  /* High contrast filter to blow out off-white background to pure white (transparent in multiply) */
-  filter: grayscale(100%) brightness(1.15) contrast(1.6);
-  opacity: 0.95;
+  filter: grayscale(100%) contrast(1.2);
 `;
 
 const Caption = styled.div`
   font-family: 'Inter', sans-serif; 
-  font-size: 1.4cqw;
-  color: #666;
+  font-size: 1.2cqw;
+  color: #444;
   margin-top: 1.5cqw;
   text-align: center;
   width: 100%;
   text-transform: uppercase;
-  letter-spacing: 0.1cqw;
+  letter-spacing: 0.05cqw;
 `;
 
 const NavigationHint = styled.div`
@@ -171,13 +189,12 @@ const NavigationHint = styled.div`
   left: 0;
   right: 0;
   text-align: center;
-  color: rgba(255,255,255,0.3);
+  color: rgba(255,255,255,0.2);
   font-family: 'Inter', sans-serif;
   font-size: 0.8rem;
   pointer-events: none;
 `;
 
-// Modified to look EXACTLY like the page content for seamless transition
 const StartInput = styled.textarea`
   width: 100%;
   height: 100%;
@@ -190,7 +207,7 @@ const StartInput = styled.textarea`
   ${typographyStyles}
 
   &::placeholder {
-    color: #888;
+    color: #666;
     font-style: italic;
     opacity: 0.5;
   }
@@ -206,31 +223,27 @@ interface PageData {
   imageUrl?: string;
   layout: LayoutType;
   hasGeneratedImage: boolean;
-  // Controls whether the typing can proceed on this page
   isContentReady: boolean;
 }
 
-const LAYOUTS: LayoutType[] = ['text-only', 'image-bottom', 'text-only', 'image-top', 'text-only'];
+const LAYOUTS: LayoutType[] = ['text-only', 'text-only', 'image-top', 'text-only', 'image-bottom'];
 
 const App = () => {
   const [hasApiKey, setHasApiKey] = useState(false);
-  const [startSeed, setStartSeed] = useState("En bønn, eller kanskje bare en rykning i det autonome nervesystemet");
+  // Default seed updated to English academic start
+  const [startSeed, setStartSeed] = useState("Approaches to language ontology are interested in poiesis, which provides an ontological reinterpretation of the correlationist myth that the world is created through language.");
   
   const [pages, setPages] = useState<PageData[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
   
-  // Navigation State
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
 
-  // Streaming state refs
   const streamBufferRef = useRef("");
   const processedCharCountRef = useRef(0);
   const generationPageIndexRef = useRef(0);
   
-  // Touch state
   const touchStartRef = useRef<number | null>(null);
 
-  // Force Update tick
   const [tick, setTick] = useState(0);
 
   useEffect(() => {
@@ -255,15 +268,20 @@ const App = () => {
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
       const prompt = `
-        Abstract, minimalist line art. Technical diagram style. 
-        Concept: "${textContext.substring(0, 100)}".
-        Style: Black ink on white. No shading. Thin lines. Scientific illustration of decay or biology.
+        Naive single-width line drawing in the style of Rodolphe Töpffer.
+        Subject: A satirical or abstract diagram illustrating: "${textContext.substring(0, 100)}".
+        Style details:
+        - Wobbly, expressive, sketchy single-line ink.
+        - Minimalist and crude but charming.
+        - Black ink on white background.
+        - NO shading, NO cross-hatching, NO gradients.
+        - Physiognomic caricature style applied to abstract concepts.
       `;
 
       const response = await ai.models.generateContent({
         model: 'gemini-3-pro-image-preview',
         contents: { parts: [{ text: prompt }] },
-        config: { imageConfig: { aspectRatio: "1:1", imageSize: "1K" } }
+        config: { imageConfig: { aspectRatio: "4:3", imageSize: "1K" } }
       });
 
       const base64 = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
@@ -274,17 +292,15 @@ const App = () => {
                 ...p, 
                 imageUrl: `data:image/png;base64,${base64}`, 
                 hasGeneratedImage: true,
-                isContentReady: true // Allow typing to resume!
+                isContentReady: true
               } 
             : p
         ));
       } else {
-         // Fallback if image fails - allow typing anyway
          setPages(prev => prev.map((p, i) => i === pageIndex ? { ...p, isContentReady: true } : p));
       }
     } catch (e) {
       console.error("Image gen failed:", e);
-      // Fallback if image fails - allow typing anyway
       setPages(prev => prev.map((p, i) => i === pageIndex ? { ...p, isContentReady: true } : p));
     }
   };
@@ -293,10 +309,9 @@ const App = () => {
     if (!startSeed.trim()) return;
     setIsGenerating(true);
     
-    // Create first page WITH the user's text
     const initialPage: PageData = {
-      id: 1,
-      text: startSeed, // Keep the user's text!
+      id: 160, // Starting at 160 to match the image prompt
+      text: startSeed,
       layout: 'text-only',
       hasGeneratedImage: false,
       isContentReady: true
@@ -306,8 +321,7 @@ const App = () => {
     setCurrentPageIndex(0);
     generationPageIndexRef.current = 0;
     
-    // Initialize buffer empty - we only stream the CONTINUATION
-    streamBufferRef.current = " "; // Add a space for safety separation
+    streamBufferRef.current = " "; 
     processedCharCountRef.current = 0;
 
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -317,7 +331,7 @@ const App = () => {
         model: 'gemini-3-pro-preview',
         contents: [{ role: 'user', parts: [{ text: startSeed }] }],
         config: { 
-          systemInstruction: ULVEN_SYSTEM_INSTRUCTION,
+          systemInstruction: ACADEMIC_SYSTEM_INSTRUCTION,
           thinkingConfig: { thinkingBudget: 1024 }
         }
       });
@@ -335,15 +349,13 @@ const App = () => {
     if (!isGenerating) return;
 
     const interval = setInterval(() => {
-      // 1. Check if the current writing page is waiting for an image
       const genIndex = generationPageIndexRef.current;
       const targetPage = pages[genIndex];
 
       if (!targetPage || !targetPage.isContentReady) {
-        return; // Pause typing until image is loaded
+        return; 
       }
 
-      // 2. Normal typing logic
       const buffer = streamBufferRef.current;
       const processed = processedCharCountRef.current;
 
@@ -358,19 +370,18 @@ const App = () => {
           currentPage.text += char;
 
           const currentLength = currentPage.text.length;
+          // Approximate check for page end based on chars
           const isAtWordBoundary = char === ' ' || char === '.' || char === '\n';
           
           if (currentLength > CHARS_PER_PAGE && isAtWordBoundary) {
             const nextLayout = LAYOUTS[(genIndex + 1) % LAYOUTS.length];
-            const newPageId = genIndex + 2;
+            const newPageId = currentPage.id + 1;
             
-            // Text only pages are ready immediately.
-            // Image pages must wait for the image generation before typing starts.
             const isNextPageReady = nextLayout === 'text-only';
 
             newPages.push({
               id: newPageId,
-              text: "", // Start next page empty
+              text: "", 
               layout: nextLayout,
               hasGeneratedImage: false,
               isContentReady: isNextPageReady
@@ -378,14 +389,12 @@ const App = () => {
 
             generationPageIndexRef.current = genIndex + 1;
             
-            // Auto-flip to new page
             if (currentPageIndex === genIndex) {
                setCurrentPageIndex(genIndex + 1);
             }
 
-            // Trigger image gen for the new page immediately
             if (nextLayout !== 'text-only') {
-               generatePageImage(genIndex + 1, currentPage.text.slice(-100));
+               generatePageImage(genIndex + 1, currentPage.text.slice(-150));
             }
           }
           return newPages;
@@ -395,9 +404,7 @@ const App = () => {
     }, TYPING_SPEED);
 
     return () => clearInterval(interval);
-  }, [isGenerating, currentPageIndex, pages]); // Added pages dependency to react to isContentReady changes
-
-  // --- Gestures ---
+  }, [isGenerating, currentPageIndex, pages]); 
 
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartRef.current = e.touches[0].clientX;
@@ -408,14 +415,12 @@ const App = () => {
     const touchEnd = e.changedTouches[0].clientX;
     const diff = touchStartRef.current - touchEnd;
 
-    // Swipe Left -> Next Page
     if (diff > 50) {
       if (currentPageIndex < pages.length - 1) {
         setCurrentPageIndex(prev => prev + 1);
       }
     }
     
-    // Swipe Right -> Prev Page
     if (diff < -50) {
       if (currentPageIndex > 0) {
         setCurrentPageIndex(prev => prev - 1);
@@ -425,15 +430,13 @@ const App = () => {
     touchStartRef.current = null;
   };
 
-  // --- Render ---
-
   if (!hasApiKey) {
     return (
       <AppContainer>
         <PageWrapper>
           <PageHeader>
-             <span>SYSTEM</span>
-             <span>ARKIV LÅST</span>
+             <HeaderNumber>000</HeaderNumber>
+             <HeaderTitle>ACCESS RESTRICTED</HeaderTitle>
           </PageHeader>
           <div style={{flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center'}}>
             <button 
@@ -449,30 +452,28 @@ const App = () => {
               }} 
               onClick={handleSelectKey}
             >
-              SETT INN NØKKEL
+              INSERT API KEY
             </button>
           </div>
-          <PageFooter>0</PageFooter>
         </PageWrapper>
       </AppContainer>
     );
   }
 
-  // Start Screen (if not generated yet)
   if (pages.length === 0) {
     return (
       <AppContainer>
         <PageWrapper>
           <PageHeader>
-            <span>Tidsskrift for spekulativ designteori</span>
-            <span>Nr. 1</span>
+            <HeaderNumber>160</HeaderNumber>
+            <HeaderTitle>Genealogies of Speculation</HeaderTitle>
           </PageHeader>
           
           <div style={{flex: 1, display: 'flex', flexDirection: 'column'}}>
             <StartInput 
               value={startSeed} 
               onChange={e => setStartSeed(e.target.value)} 
-              placeholder="Skriv åpningen her..."
+              placeholder="Enter text..."
               autoFocus
               onKeyDown={(e) => {
                 if (e.key === 'Enter') {
@@ -482,17 +483,17 @@ const App = () => {
               }}
             />
           </div>
-
-          <PageFooter>
-            <span>161</span> {/* Fake page number from example */}
-            <span>1</span>
-          </PageFooter>
         </PageWrapper>
       </AppContainer>
     );
   }
 
   const activePage = pages[currentPageIndex];
+  
+  // Logic for running header: Left vs Right page. 
+  // Even numbers (verso) usually have number on left, Title.
+  // Odd numbers (recto) usually have Title, number on right.
+  const isVerso = activePage.id % 2 === 0;
 
   return (
     <>
@@ -503,15 +504,24 @@ const App = () => {
       >
         <PageWrapper>
           <PageHeader>
-            <span>Tidsskrift for spekulativ designteori</span>
-            <span>Nr. {activePage.id}</span>
+            {isVerso ? (
+              <>
+                <HeaderNumber>{activePage.id}</HeaderNumber>
+                <HeaderTitle>Genealogies of Speculation</HeaderTitle>
+              </>
+            ) : (
+              <>
+                <HeaderTitle>Materialism and Subjectivity</HeaderTitle>
+                <HeaderNumber>{activePage.id}</HeaderNumber>
+              </>
+            )}
           </PageHeader>
 
           <ContentGrid $layout={activePage.layout}>
             {activePage.layout === 'image-top' && activePage.imageUrl && (
                 <IllustrationContainer>
                   <Illustration src={activePage.imageUrl} />
-                  <Caption>Fig. {activePage.id}a</Caption>
+                  <Caption>Fig. {activePage.id}.1</Caption>
                 </IllustrationContainer>
             )}
 
@@ -522,15 +532,10 @@ const App = () => {
             {activePage.layout === 'image-bottom' && activePage.imageUrl && (
                 <IllustrationContainer>
                   <Illustration src={activePage.imageUrl} />
-                  <Caption>Fig. {activePage.id}b</Caption>
+                  <Caption>Fig. {activePage.id}.2</Caption>
                 </IllustrationContainer>
             )}
           </ContentGrid>
-
-          <PageFooter>
-             <span>{160 + activePage.id}</span>
-             <span>{activePage.id}</span>
-          </PageFooter>
         </PageWrapper>
 
         {pages.length > 1 && (
