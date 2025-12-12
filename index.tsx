@@ -161,28 +161,16 @@ const FixedImageFrame = styled.div`
   justify-content: center;
   align-items: center;
   overflow: hidden;
-  /* Optional: faint border to show the 'frame' during loading or purely layout */
-  /* border: 1px dashed #eee; */ 
 `;
 
 const Illustration = styled.img`
   max-width: 100%; 
-  max-height: 85%;
+  max-height: 95%;
   height: auto;
   width: auto;
   display: block;
   mix-blend-mode: multiply; 
   filter: grayscale(100%) contrast(1.2);
-`;
-
-const Caption = styled.div`
-  font-family: 'EB Garamond', serif; 
-  font-style: italic;
-  font-size: 1.8cqw;
-  color: #444;
-  margin-top: 1cqw;
-  text-align: center;
-  width: 100%;
 `;
 
 const NavigationHint = styled.div`
@@ -226,8 +214,8 @@ interface PageData {
   isContentReady: boolean;
 }
 
-// Layout cycle
-const LAYOUTS: LayoutType[] = ['text-only', 'text-only', 'image-top', 'text-only', 'image-bottom'];
+// Layout cycle: More images (2/3 pages have images)
+const LAYOUTS: LayoutType[] = ['text-only', 'image-top', 'image-bottom'];
 
 const App = () => {
   const [hasApiKey, setHasApiKey] = useState(false);
@@ -265,26 +253,53 @@ const App = () => {
     }
   };
 
+  const getStyleReference = async (): Promise<string | null> => {
+    try {
+        const response = await fetch('/style.jpg');
+        if (!response.ok) return null;
+        const blob = await response.blob();
+        return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                const base64 = (reader.result as string).split(',')[1];
+                resolve(base64);
+            };
+            reader.readAsDataURL(blob);
+        });
+    } catch (e) {
+        console.log("No style reference found (style.jpg)");
+        return null;
+    }
+  };
+
   const generatePageImage = async (pageIndex: number, textContext: string) => {
     if (pages[pageIndex]?.hasGeneratedImage) return;
     
     try {
       const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const refImage = await getStyleReference();
       
-      const prompt = `
-        Lag en naiv, enkel strektegning i stil med Rodolphe Töpffer.
+      const promptText = `
+        Lag en naiv, enkel strektegning.
         Motiv: En abstrakt eller surrealistisk tolkning av denne teksten: "${textContext.substring(0, 300)}".
         
         STILINSTRUKSER:
         - Enkel, vaklevoren blekkstrek.
         - Svart strek på hvit bakgrunn.
         - INGEN farger eller gråtoner.
-        - Minimalistisk og "ødelagt".
+        - Minimalistisk.
+        ${refImage ? 'VIKTIG: Bruk det vedlagte bildet som STILREFERANSE for strekføring og estetikk.' : 'Stil: Som Rodolphe Töpffer.'}
       `;
+
+      const parts: any[] = [];
+      if (refImage) {
+          parts.push({ inlineData: { mimeType: 'image/jpeg', data: refImage }});
+      }
+      parts.push({ text: promptText });
 
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash-image',
-        contents: { parts: [{ text: prompt }] },
+        contents: { parts: parts },
         config: { 
           imageConfig: { aspectRatio: "4:3" }
         }
@@ -540,10 +555,7 @@ const App = () => {
             {activePage.layout === 'image-top' && (
                <FixedImageFrame>
                  {activePage.imageUrl && (
-                    <>
                     <Illustration src={activePage.imageUrl} />
-                    <Caption>Fig. {activePage.id}</Caption>
-                    </>
                  )}
                </FixedImageFrame>
             )}
@@ -557,10 +569,7 @@ const App = () => {
             {activePage.layout === 'image-bottom' && (
                 <FixedImageFrame>
                    {activePage.imageUrl && (
-                      <>
                       <Illustration src={activePage.imageUrl} />
-                      <Caption>Fig. {activePage.id}</Caption>
-                      </>
                    )}
                 </FixedImageFrame>
             )}
