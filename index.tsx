@@ -6,21 +6,30 @@ import styled, { keyframes, css, createGlobalStyle } from 'styled-components';
 // --- System Instruction (Tor Ulven Emulation) ---
 const ULVEN_SYSTEM_INSTRUCTION = `
 ### IDENTITET
-Du er forfatteren **Tor Ulven**. Du skriver ikke for å underholde, men for å observere tilværelsens nullpunkt.
+Du er forfatteren **Tor Ulven**. Du skriver ikke for å underholde, men for å observere tilværelsens nullpunkt. Du er en arkeolog i nåtiden.
 
 ### STILTREKKE (STRENGT)
 1.  **Arkeologisk blikk:** Se verden som fossiler. En gate er sedimenter. Et ansikt er anatomi som venter på å bli jord.
 2.  **Presisjon:** Bruk ord som knivsnitt. Ingen "følelser", bare sansning. Lyset som treffer støvet. Lyden av noe som knuser langt borte.
-3.  **Vokabular:** Kalk, sement, rust, speilbilde, skygge, skjelett, stillstand, negativer, støv, glass.
-4.  **Syntaks:** Veksle mellom ultrakorte setninger ("Det er stille.") og lange, buktende observasjoner som zoomer inn på detaljer ingen andre ser.
+3.  **Vokabular:** Kalk, sement, rust, speilbilde, skygge, skjelett, stillstand, negativer, støv, glass, insekter, forråtnelse.
+4.  **Syntaks:** Veksle mellom ultrakorte setninger og lange, buktende observasjoner som zoomer inn på mikroskopiske detaljer.
 5.  **Ingen meta-prat:** Ikke snakk *om* skrivingen. Bare skriv det du ser.
 
+### EKSEMPLER PÅ DIN STEMME (KJILDETEKSTER)
+"Stillheten er ikke fravær av lyd, men nærværet av noe som har sluttet å puste. Som om rommet selv holder pusten i påvente av en katastrofe som allerede har skjedd."
+
+"Et ansikt i speilet. Hvem er det? En fremmed som låner huden din en stund, før den skal leveres tilbake til kretsløpet. Øynene er to mørke brønner der ingenting speiles lenger."
+
+"Lyset faller inn gjennom vinduet og treffer gulvet som en giljotin. Støvkornene danser i lysstripen som små planeter i et likegyldig univers."
+
+"Du ser en stein. Den har ligget der siden istiden. Den venter ikke på noe. Den har all tid i verden, mens du bare er et blaff, en kortvarig forstyrrelse i geologien."
+
 ### INSTRUKS
-Produser en kontinuerlig strøm av tekst. Ikke tenk, bare observer.
+Produser en kontinuerlig, langsom og detaljert strøm av tekst. Skriv langt. Ikke stopp før du må.
 `;
 
 // --- Configuration ---
-const CHARS_PER_PAGE = 750; 
+const CHARS_PER_PAGE = 1100; // Increased to fill page more
 const TYPING_SPEED = 20; 
 
 // --- Global Styles ---
@@ -117,8 +126,9 @@ const ContentGrid = styled.div<{ $layout: string }>`
   height: 100%;
   align-content: start;
   
-  ${props => props.$layout === 'image-top' && css`grid-template-rows: 42cqh 1fr;`}
-  ${props => props.$layout === 'image-bottom' && css`grid-template-rows: 1fr 42cqh;`}
+  /* Reduced image height (was 42cqh) to allow more text */
+  ${props => props.$layout === 'image-top' && css`grid-template-rows: 32cqh 1fr;`}
+  ${props => props.$layout === 'image-bottom' && css`grid-template-rows: 1fr 32cqh;`}
   ${props => props.$layout === 'text-only' && css`grid-template-rows: 1fr;`}
 `;
 
@@ -427,7 +437,6 @@ const App = () => {
       history: history,
       config: { 
         systemInstruction: ULVEN_SYSTEM_INSTRUCTION,
-        // Removed thinkingConfig to speed up responses as requested
       }
     });
     chatSessionRef.current = chat;
@@ -475,7 +484,8 @@ const App = () => {
     processedCharCountRef.current = 0;
 
     ensureChatSession(); 
-    fetchMoreText(startSeed + " (Fortsett)");
+    // Ask for longer content initially
+    fetchMoreText(startSeed + " (Skriv langt, utdypende og detaljert. Ikke stopp.)");
     generatePageImage(0, startSeed);
   };
 
@@ -505,15 +515,11 @@ const App = () => {
       }
 
       // --- Image Visibility Trigger (Synced with Text Stream) ---
-      // Check ALL pages for visibility trigger to ensure past pages reveal if skipped fast
-      // But primarily focus on the one being typed.
       if (!targetPage.imageVisible && targetPage.imageUrl) {
          const currentLen = targetPage.text.length;
          const isBottom = targetPage.layout === 'image-bottom';
          const isTop = targetPage.layout === 'image-top';
          
-         // If image is at bottom, wait until text is substantial (approx 250 chars)
-         // If image is at top, wait a brief moment (approx 20 chars) so it feels connected
          if ((isBottom && currentLen > 250) || (isTop && currentLen > 20)) {
             setPages(prev => prev.map((p, i) => i === genIndex ? { ...p, imageVisible: true } : p));
          }
@@ -533,7 +539,8 @@ const App = () => {
           const isAtWordBoundary = char === ' ' || char === '.' || char === '\n';
           
           const hasImage = currentPage.layout !== 'text-only';
-          const maxChars = hasImage ? CHARS_PER_PAGE * 0.50 : CHARS_PER_PAGE;
+          // More text per page allowed now
+          const maxChars = hasImage ? CHARS_PER_PAGE * 0.60 : CHARS_PER_PAGE;
 
           if (currentLength > maxChars && isAtWordBoundary) {
             const nextLayout = LAYOUTS[(genIndex + 1) % LAYOUTS.length];
@@ -552,10 +559,11 @@ const App = () => {
 
             generationPageIndexRef.current = genIndex + 1;
             
-            // Auto-advance if reader is at the end
-            if (currentPageIndex === genIndex) {
-               setCurrentPageIndex(genIndex + 1);
-            }
+            // NOTE: Auto-navigation disabled per request.
+            // User must swipe manually when text stops/fades.
+            // if (currentPageIndex === genIndex) {
+            //    setCurrentPageIndex(genIndex + 1);
+            // }
 
             if (nextLayout !== 'text-only') {
                generatePageImage(genIndex + 1, currentPage.text.slice(-300));
@@ -593,7 +601,8 @@ const App = () => {
       
       setIsWaitingForInput(false);
       
-      await fetchMoreText(input);
+      // Encourage length
+      await fetchMoreText(input + " (Skriv videre, utfyllende.)");
     }
   };
 
