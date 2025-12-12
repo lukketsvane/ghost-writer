@@ -244,8 +244,20 @@ const App = () => {
   const touchStartRef = useRef<number | null>(null);
   const [tick, setTick] = useState(0);
 
+  // Helper to get key from environment or prototype
+  const getApiKey = () => {
+    return process.env.API_KEY || process.env.GEMINI_API_KEY;
+  };
+
   useEffect(() => {
     const checkKey = async () => {
+      // 1. Check environment variable (Production/Vercel)
+      if (getApiKey()) {
+        setHasApiKey(true);
+        return;
+      }
+      
+      // 2. Check AI Studio prototype wrapper
       if (window.aistudio && await window.aistudio.hasSelectedApiKey()) {
         setHasApiKey(true);
       }
@@ -286,7 +298,15 @@ const App = () => {
     setPages(prev => prev.map((p, i) => i === pageIndex ? { ...p, hasGeneratedImage: true } : p));
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const apiKey = getApiKey();
+      // Ensure we have a key before calling
+      if (!apiKey && (!window.aistudio || !await window.aistudio.hasSelectedApiKey())) {
+          console.error("No API Key available");
+          return;
+      }
+      
+      const ai = new GoogleGenAI({ apiKey: apiKey || "" });
+      
       const refImage = await getStyleReference();
       
       const promptText = `
@@ -385,7 +405,8 @@ const App = () => {
     streamBufferRef.current = " "; 
     processedCharCountRef.current = 0;
 
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const apiKey = getApiKey();
+    const ai = new GoogleGenAI({ apiKey: apiKey || "" });
     
     const chat = ai.chats.create({
       model: 'gemini-3-pro-preview',
