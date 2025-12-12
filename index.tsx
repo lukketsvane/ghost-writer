@@ -165,7 +165,7 @@ const FixedImageFrame = styled.div`
   overflow: hidden;
 `;
 
-const Illustration = styled.img`
+const Illustration = styled.img<{ $visible: boolean }>`
   max-width: 100%; 
   max-height: 98%;
   height: auto;
@@ -173,6 +173,8 @@ const Illustration = styled.img`
   display: block;
   mix-blend-mode: multiply; 
   filter: grayscale(100%) contrast(1.3);
+  opacity: ${props => props.$visible ? 1 : 0};
+  transition: opacity 2s ease-in-out;
 `;
 
 const NavigationHint = styled.div`
@@ -215,6 +217,7 @@ interface PageData {
   layout: LayoutType;
   hasGeneratedImage: boolean;
   isContentReady: boolean;
+  imageVisible: boolean;
 }
 
 // Layout cycle: Alternating or specific pattern
@@ -371,7 +374,8 @@ const App = () => {
       text: startSeed,
       layout: 'image-bottom', // FORCE FIRST PAGE TO HAVE IMAGE AT BOTTOM
       hasGeneratedImage: false,
-      isContentReady: true
+      isContentReady: true,
+      imageVisible: false // Initially hidden
     };
     
     setPages([initialPage]);
@@ -397,6 +401,22 @@ const App = () => {
     // Trigger image generation immediately for the first page
     generatePageImage(0, startSeed);
   };
+
+  // Visibility Timer Effect: Reveal image 4s after page becomes active
+  useEffect(() => {
+    if (!isStarted) return;
+    const targetIndex = currentPageIndex;
+    if (!pages[targetIndex]) return;
+
+    // Trigger reveal after 4 seconds of "reading" the page
+    const timer = setTimeout(() => {
+      setPages(prev => prev.map((p, i) => 
+        i === targetIndex ? { ...p, imageVisible: true } : p
+      ));
+    }, 4000);
+
+    return () => clearTimeout(timer);
+  }, [currentPageIndex, isStarted]); 
 
   useEffect(() => {
     if (!isStarted) return;
@@ -442,7 +462,8 @@ const App = () => {
               text: "", 
               layout: nextLayout,
               hasGeneratedImage: false,
-              isContentReady: isNextPageReady
+              isContentReady: isNextPageReady,
+              imageVisible: false // Hidden by default on new page
             });
 
             generationPageIndexRef.current = genIndex + 1;
@@ -565,7 +586,7 @@ const App = () => {
             {activePage.layout === 'image-top' && (
                <FixedImageFrame>
                  {activePage.imageUrl && (
-                    <Illustration src={activePage.imageUrl} />
+                    <Illustration src={activePage.imageUrl} $visible={activePage.imageVisible} />
                  )}
                </FixedImageFrame>
             )}
@@ -579,7 +600,7 @@ const App = () => {
             {activePage.layout === 'image-bottom' && (
                 <FixedImageFrame>
                    {activePage.imageUrl && (
-                      <Illustration src={activePage.imageUrl} />
+                      <Illustration src={activePage.imageUrl} $visible={activePage.imageVisible} />
                    )}
                 </FixedImageFrame>
             )}
