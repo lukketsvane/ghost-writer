@@ -3,8 +3,94 @@ import { createRoot } from 'react-dom/client';
 import { GoogleGenAI, Chat } from "@google/genai";
 import styled, { keyframes, css, createGlobalStyle } from 'styled-components';
 
-// --- System Instruction (Tor Ulven Emulation) ---
-const ULVEN_SYSTEM_INSTRUCTION = `
+interface CorpusItem {
+  type: 'prose' | 'poem';
+  text: string;
+}
+
+// --- DATA: Tor Ulven Corpus (Extracted from Source) ---
+const ULVEN_CORPUS: CorpusItem[] = [
+  // --- FRA: GRAVGAVER (Prosa) ---
+  { 
+    type: 'prose', 
+    text: "Hver dag gående oppå fem tusen to hundre og femogfemti rester av kylling, tre hundre sauelår, et ubestemt tusentall potteskår, et dusin forfalskede terninger, en påfugl, seks hundre og tretten muslinger, en pose med kobbermynter, to hundre og femti hårbørster, fragmenter av en kongelig hjelm, et marsvinskjelett, en keramikkovn, rester av en mur, atskillige havskilpadder, et verksted for pipehoder, samt talløse andre ting, hver dag, uten å vite om dét der nede under dem, under surret av stemmene deres og dameskoenes klaprende hæler." 
+  },
+  { 
+    type: 'prose', 
+    text: "En dato. For eksempel den 22. november 1953. Denne dagen, eller snarere kvelden (lokal tid) da Arturo Toscanini dirigerte NBC Symphony Orchestra i Tragische Ouvertüre av Brahms. Han dirigerte utvilsomt også andre verker, men på den platen hvis gullomslag nå (et allerede foreldet nå) lyser foran meg, finnes fra denne konserten utelukkende inngravert de 14 minutter og 7 sekunder det (ifølge coveret) tok Toscanini å fremføre dette stykket, kanskje Brahms’ dystreste og mest ubønnhørlige (ved siden av passacaglia-satsen i 4. symfoni), hjemsøkt av desperate marsjrytmer, uthult av truende pauser, som i det lumre blåmørket mellom to tordenbrak." 
+  },
+  {
+    type: 'prose',
+    text: "Allerede det å skrive noe ned, nedover, et kjærlighetsbrev, for eksempel, er å markere det arkeologiske, som å gå i våt jord etter regn, sammen med en kjæreste, stanse og se tilbake på sporene, og plutselig er landskapet med jorden, gresset og trærne som drypper av regn eldgammelt, og sporene deres, sålemønstrene, de skjeve skligropene etter hælene, de står der ennå, som om dere nettopp hadde gått gjennom lysningen i skogen, mens det i virkeligheten er hundrevis av år siden, og ingen husker dere mer."
+  },
+  {
+    type: 'prose',
+    text: "På overflaten av alle skaller finnes de takkete sømmene, suturene, som om kraniet også fra først av var en samling skår, en knust krukke føyd sammen for å fylles med et jeg, og siden tømmes for det igjen; kraniet som en relativt uforanderlig form til å fylle med ulike personligheter fra ulike tider."
+  },
+  
+  // --- FRA: ETTER OSS, TEGN (Dikt) ---
+  { 
+    type: 'poem', 
+    text: "Dine fem sprikende fingre,\nfem fangetårn\nder du selv sitter\ninnesperret\ni fem forskjellige skikkelser.\n\nHver skjelvende berøring\nfår et tårn\ntil å rase." 
+  },
+  {
+    type: 'poem',
+    text: "Gullbokstavene våker\nover den uttømte byen.\n\nHer fant landeplagen hvile\nfor sin skinnmagre skrott.\n\nDen siste innbyggeren\ntaler til utstillingsdukkene.\n\nHan sier: Grav\nhånden ned i jorden\nog se\nom du vokser opp."
+  },
+  {
+    type: 'poem',
+    text: "Brevene: papirbåter\nsom dupper bort\nunder brobuen,\nder det rotfaste dyret\nstår på sprang\ni år også."
+  },
+  {
+    type: 'poem',
+    text: "Strykekvartett\nfor halvt nedgravde instrumenter\nlangt inni skogen\nden grønne.\nAv bark og humus, musikerne,\nlar seg tålsomt oppløse\ni regnet, når spillet\nhar vendt tilbake\ntil stillheten\ndet kom fra."
+  },
+
+  // --- FRA: NEI, IKKE DET (Historier) ---
+  {
+    type: 'prose',
+    text: "Det er om ettermiddagen. Mot den blasse, disige og skyede himmelen lyner en klynge svære, ribbede eiketrær, negativt, i svart, synsnerver amputert for sitt grønne øyeeple, med snø blåst inn i stammenes barkfurer og greinkløftene, to stammer i matt speiling (grumset til med isklumper, pinner og steiner), ved siden av skyggebildene av de tre barna som sklir på isen."
+  },
+  {
+    type: 'prose',
+    text: "Tett i nesen. Igjen et av disse kulerunde valgene: våkne frysende eller tett i nesen, med radiatoren av eller på, med skjelvinger eller pustevansker. Gudskjelov var han igjen svært usikker på datoen."
+  },
+  {
+    type: 'prose',
+    text: "Ennå ikke helt mørkt, men et slags mørke ble det, etter at hun trykket tommelfingeren med den lange, røde neglen mot bryteren (som ligner en kort, rund nese, den blir litt lengre når lampen slukkes), etter at hun lukket boken og lente seg over deg, slik at det hvite perlekjedet falt ned i halsgropen din, det var kaldt og kilte."
+  },
+
+  // --- FRA: FORSVINNINGSPUNKT (Dikt) ---
+  {
+    type: 'poem',
+    text: "Du når det\naldri\ndu kjører så fort\nat fartsgrensene\nhvitner\nveien blir bredere det lysende\npunktet er\nder det er\nforut det vokser\ndet blender du\ner langt inne i\nflimmeret og forstummingen."
+  },
+  {
+    type: 'poem',
+    text: "Jeg prøver å skrive fortere\nenn forsvinningen\nfarer\ngjennom meg.\n\nJo.\n\nDe snør meg ned\nlevende. Solen\ner bitte liten, men\naltetende."
+  },
+  {
+    type: 'poem',
+    text: "De er ikke\nher. De oscillerer\n\nmellom jorden\nog solen.\n\nSvingetallet\nså høyt\nat farten nærmer seg\nforsteining."
+  },
+
+  // --- FRA: STEIN OG SPEIL ---
+  {
+    type: 'prose',
+    text: "Monumentet er et monument over sin egen glemsel. Og får mening først når det ikke finnes noen som kan gi det mening. Det er steinen du holder i hånden. Som du aldri når inn til. Bare speilet viser alltid riktig tid. Når steinen speiler seg, er det ikke av forfengelighet. Speilet røper alt, steinen ingenting. Som stein og speil er det du helst vil vite."
+  },
+  {
+    type: 'prose',
+    text: "Mygg død i givakt. Hvit vinduskarm. Vasen ved siden av. Billig. Dårlig smak. Bilde av? Død uten pine. Som om naturen sto i givakt for kulturen. Ikke tilfelle. Håpe at det varer lenge før noen kommer med en våt klut og med et sveip river ned myggen. Som om den var et spinkelt, sårbart og kjært husdyr. Det stilleste i verden."
+  },
+  {
+    type: 'poem',
+    text: "Vi står stille.\nVi blir mindre\nenn vår egen\nidentitet.\n\nInnskriftene\nslettes,\nog er gyldige\ndér.\n\nVeiene\nfører bort fra\noss.\n\nSpeilet\nspeiler\nen stor tom\nprosess"
+  }
+];
+
+// --- System Instruction Generator ---
+const getSystemInstruction = (examples: string) => `
 ### IDENTITET
 Du er **Tor Ulven**. Du er ikke en forteller, men en tålmodig observatør av materiens langsomme forfall. Du står i et nullpunkt der tiden nesten står stille.
 
@@ -12,18 +98,19 @@ Du er **Tor Ulven**. Du er ikke en forteller, men en tålmodig observatør av ma
 1.  **Arkeologisk blikk:** Se på nåtiden som om den allerede er fortid. En buss er en rusten beholder. Et ansikt er en maske over en hodeskalle. Alt er fossiler som venter på utgravning.
 2.  **Det trivielle:** En flekk på duken, en sprukken flis, støv i en lysstråle – dette er universets sentrum.
 3.  **Nektelsen:** Beskriv verden gjennom det den *ikke* er. Fraværet er like virkelig som nærværet.
-4.  **Vokabular:** Kalk, sement, rust, speilbilde, skygge, skjelett, stillstand, negativer, støv, glass, insekter, forråtnelse, kritt, bein, stillhet, trilobitter.
+4.  **Vokabular:** Kalk, sement, rust, speilbilde, skygge, skjelett, stillstand, negativer, støv, glass, insekter, forråtnelse, kritt, bein, stillhet, trilobitter, amfibium, suturer, kranium.
 
-### STIL
-*   **Tone:** Kjølig, presis, melankolsk, men aldri sentimental.
-*   **Setninger:** Veksle mellom korthugde konstanteringer ("Det blir mørkt.") og lange, suggererende setninger som zoomer inn på mikroskopiske detaljer.
+### STIL-EKSEMPLER (DITT FAKTISKE SPRÅK)
+Følgende tekster er dine. Analyser rytmen, setningslengden og metaforene. Du skal skrive nøyaktig slik, som en forlengelse av disse tankene:
+
+${examples}
 
 ### INSTRUKS
-Produser en tekst som flyter langsomt. Ingen dramatikk, ingen dialog, bare en intens sansevarhet for tingene og stillheten.
+Produser tekst som flyter organisk. Du vil motta spesifikke instruksjoner om tetthet (prosa vs poesi) for hvert avsnitt. Følg dem nøye. Ikke vær redd for å være mørk, klinisk og presis.
 `;
 
 // --- Configuration ---
-const CHARS_PER_PAGE = 1200; // Increased to fill page more
+const CHARS_PER_PAGE = 1200; 
 const TYPING_SPEED = 20; 
 
 // --- Global Styles ---
@@ -161,17 +248,14 @@ const FixedImageFrame = styled.div`
   justify-content: center;
   align-items: center;
   overflow: hidden;
-  /* Ensure frame doesn't clip ink if we want bleed, but usually contain is best */
 `;
 
 const Illustration = styled.img<{ $visible: boolean }>`
   width: 100%;
   height: 100%;
-  object-fit: contain; /* Ensure the whole drawing is visible */
+  object-fit: contain; 
   display: block;
   
-  /* CRITICAL: This blend mode + filter stack removes the white background 
-     making it look like ink on the paper texture */
   mix-blend-mode: multiply; 
   filter: grayscale(100%) contrast(1.5) brightness(1.05);
   
@@ -208,7 +292,6 @@ const StartInput = styled.textarea`
   }
 `;
 
-// Pulsing period / cursor
 const PulsingPeriod = styled.span`
   display: inline-block;
   font-weight: 900;
@@ -219,10 +302,8 @@ const PulsingPeriod = styled.span`
 
 const UserInputSpan = styled.span`
   color: #333;
-  /* text-decoration: underline; */ /* Optional: distinguish user text */
 `;
 
-// Hidden input to capture mobile keyboard
 const HiddenInput = styled.textarea`
   position: absolute;
   opacity: 0;
@@ -230,7 +311,7 @@ const HiddenInput = styled.textarea`
   left: 0;
   height: 1px;
   width: 1px;
-  pointer-events: none; /* We programmatically focus it */
+  pointer-events: none; 
 `;
 
 // --- Logic ---
@@ -247,7 +328,6 @@ interface PageData {
   imageVisible: boolean;
 }
 
-// Reduced frequency of images (more text-only pages)
 const LAYOUTS: LayoutType[] = [
   'text-only', 
   'text-only', 
@@ -313,21 +393,17 @@ const App = () => {
         setPages(parsedPages);
         setIsStarted(true);
         
-        // Restore index
         if (cachedIndex) {
           const idx = parseInt(cachedIndex, 10);
           setCurrentPageIndex(isNaN(idx) ? 0 : idx);
         }
         
-        // Restore generation state (assume finished fetching for cached content)
-        // Set pointers to the end of cached text
         let totalText = "";
         parsedPages.forEach((p: PageData) => totalText += p.text);
         streamBufferRef.current = totalText;
         processedCharCountRef.current = totalText.length;
         generationPageIndexRef.current = parsedPages.length - 1;
 
-        // Force into input mode if we just loaded
         setIsWaitingForInput(true);
       } catch (e) {
         console.error("Cache load error", e);
@@ -398,7 +474,6 @@ const App = () => {
 
       let base64 = null;
 
-      // Helper to extract image from response
       const extractImage = (response: any) => {
          if (response.candidates?.[0]?.content?.parts) {
             for (const part of response.candidates[0].content.parts) {
@@ -409,7 +484,6 @@ const App = () => {
       };
 
       try {
-         // Try Pro Model first (High Quality, follows "nano banana pro" request)
          const response = await ai.models.generateContent({
             model: 'gemini-3-pro-image-preview',
             contents: { parts: parts },
@@ -418,7 +492,6 @@ const App = () => {
          base64 = extractImage(response);
       } catch (proError) {
          console.warn("Pro model failed, falling back to Flash", proError);
-         // Fallback to Flash Model if Pro fails (e.g. key permissions, region)
          const response = await ai.models.generateContent({
             model: 'gemini-2.5-flash-image',
             contents: { parts: parts },
@@ -446,11 +519,20 @@ const App = () => {
     const apiKey = getApiKey();
     const ai = new GoogleGenAI({ apiKey: apiKey || "" });
     
-    // If we are recovering from a reload, try to give context
+    // Pick random context from the large ULVEN_CORPUS to ensure variablity
+    const getRandomExamples = (count: number) => {
+        // Simple shuffle
+        const shuffled = [...ULVEN_CORPUS].sort(() => 0.5 - Math.random());
+        // Select first 'count' items and format them
+        return shuffled.slice(0, count).map(item => `[${item.type.toUpperCase()}]\n${item.text}`).join("\n\n---\n\n");
+    };
+    
+    // Pick ~6 diverse examples to fill the context window with "Ulven-ness"
+    const contextExamples = getRandomExamples(6);
+    const dynamicSystemInstruction = getSystemInstruction(contextExamples);
+
     let history = [];
     if (pages.length > 0) {
-      // Reconstruct simple history: Model said everything so far.
-      // Limits context window usage by just taking last ~2000 chars if huge
       const fullText = pages.map(p => p.text).join(" ");
       const contextText = fullText.slice(-3000); 
       
@@ -464,7 +546,7 @@ const App = () => {
       model: 'gemini-3-pro-preview',
       history: history,
       config: { 
-        systemInstruction: ULVEN_SYSTEM_INSTRUCTION,
+        systemInstruction: dynamicSystemInstruction,
       }
     });
     chatSessionRef.current = chat;
@@ -477,7 +559,21 @@ const App = () => {
     isFetchingRef.current = true;
     try {
       const chat = ensureChatSession();
-      const resp = await chat.sendMessageStream({ message: promptText });
+
+      // Randomize style density (Prompt Augmentation)
+      const r = Math.random();
+      let styleInstruction = "";
+      
+      // 40% chance of sparse poetry/fragments, 60% dense prose
+      if (r < 0.4) {
+          styleInstruction = "(STILINSTRUKSJON FOR DETTE AVSNITTET: Skriv minimalistisk. Bruk korte linjer, bruddstykker, og mye luft. Lyrisk preg. Fokuser på lys/skygge.)";
+      } else {
+          styleInstruction = "(STILINSTRUKSJON FOR DETTE AVSNITTET: Skriv tett, sammenhengende prosa. Detaljrike, arkeologiske beskrivelser. Lange setninger som bukter seg. Fokuser på materiens forfall.)";
+      }
+
+      const fullPrompt = `${promptText} \n\n${styleInstruction}`;
+      
+      const resp = await chat.sendMessageStream({ message: fullPrompt });
       
       for await (const chunk of resp) {
         const txt = chunk.text;
@@ -512,7 +608,6 @@ const App = () => {
     processedCharCountRef.current = 0;
 
     ensureChatSession(); 
-    // Ask for longer content initially
     fetchMoreText(startSeed + " (Skriv langt, utdypende og detaljert. Ikke stopp.)");
     generatePageImage(0, startSeed);
   };
@@ -567,7 +662,6 @@ const App = () => {
           const isAtWordBoundary = char === ' ' || char === '.' || char === '\n';
           
           const hasImage = currentPage.layout !== 'text-only';
-          // More text per page allowed now
           const maxChars = hasImage ? CHARS_PER_PAGE * 0.60 : CHARS_PER_PAGE;
 
           if (currentLength > maxChars && isAtWordBoundary) {
@@ -605,7 +699,6 @@ const App = () => {
     const now = Date.now();
     const diff = now - lastTapRef.current;
     
-    // De-bounce very fast double-invocations (e.g. touch + click overlap)
     if (diff < 100) return;
 
     if (diff < 500) {
@@ -643,8 +736,7 @@ const App = () => {
       
       setIsWaitingForInput(false);
       
-      // Encourage length
-      await fetchMoreText(input + " (Skriv videre, utfyllende.)");
+      await fetchMoreText(input);
     }
   };
 
@@ -660,7 +752,7 @@ const App = () => {
     const diff = touchStartRef.current - touchEnd;
 
     if (Math.abs(diff) < 10) {
-      handlePageTap(); // Treat as tap
+      handlePageTap(); 
     } else {
       if (diff > 50 && currentPageIndex < pages.length - 1) {
         setCurrentPageIndex(prev => prev + 1);
@@ -766,7 +858,6 @@ const App = () => {
 
             <TextBody>
                 {activePage.text}
-                {/* Render draft input if we are on the active page and waiting */}
                 {isWaitingForInput && currentPageIndex === pages.length - 1 && (
                   <>
                     <UserInputSpan>{draftInput}</UserInputSpan>
