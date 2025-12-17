@@ -113,12 +113,17 @@ Produser tekst som flyter organisk. Du vil motta spesifikke instruksjoner om tet
 const CHARS_PER_PAGE = 1200; 
 const TYPING_SPEED = 20; 
 
+// --- ElevenLabs TTS Configuration ---
+const ELEVENLABS_API_KEY = 'sk_296580504138f5821a6940e98ce50629ff5e83300c6f629b';
+const ELEVENLABS_VOICE_ID = 'hkKiqJZT28yvlZUmKzGb';
+const ELEVENLABS_MODEL_ID = 'eleven_multilingual_v2'; // 2.5 model for Norwegian
+
 // --- Global Styles ---
 const GlobalStyle = createGlobalStyle`
   body {
     margin: 0;
     padding: 0;
-    background-color: #1a1a1a;
+    background-color: #fff;
     color: #000;
     font-family: 'EB Garamond', serif;
     overflow: hidden;
@@ -143,7 +148,7 @@ const AppContainer = styled.div`
   align-items: center;
   height: 100vh;
   width: 100vw;
-  background-color: #111;
+  background-color: #fff;
   perspective: 1500px;
 `;
 
@@ -269,7 +274,7 @@ const NavigationHint = styled.div`
   left: 0;
   right: 0;
   text-align: center;
-  color: rgba(255,255,255,0.2);
+  color: rgba(0,0,0,0.2);
   font-family: 'Inter', sans-serif;
   font-size: 0.8rem;
   pointer-events: none;
@@ -365,7 +370,118 @@ const App = () => {
   const lastTapRef = useRef(0);
   const tapCountRef = useRef(0);
 
+  // TTS refs
+  const ttsBufferRef = useRef("");
+  const ttsQueueRef = useRef<string[]>([]);
+  const isTTSPlayingRef = useRef(false);
+  const audioContextRef = useRef<AudioContext | null>(null);
+
   const getApiKey = () => process.env.API_KEY || process.env.GEMINI_API_KEY;
+
+  // --- ElevenLabs TTS Functions ---
+  
+  const initAudioContext = () => {
+    if (!audioContextRef.current) {
+      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+    }
+    return audioContextRef.current;
+  };
+
+  const speakText = async (text: string) => {
+    if (!text.trim()) return;
+    
+    try {
+      const response = await fetch(
+        `https://api.elevenlabs.io/v1/text-to-speech/${ELEVENLABS_VOICE_ID}/stream`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'xi-api-key': ELEVENLABS_API_KEY,
+          },
+          body: JSON.stringify({
+            text: text,
+            model_id: ELEVENLABS_MODEL_ID,
+            voice_settings: {
+              stability: 0.0,         // 0% stability
+              similarity_boost: 1.0,   // 100% similarity
+              style: 0.0,
+              use_speaker_boost: true
+            },
+            // 30% slower than normal (speed 1.0 is normal, 0.7 is 30% slower)
+            // ElevenLabs uses speed where lower = slower
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        console.error('ElevenLabs TTS error:', response.status);
+        return;
+      }
+
+      const audioContext = initAudioContext();
+      const arrayBuffer = await response.arrayBuffer();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      
+      const source = audioContext.createBufferSource();
+      source.buffer = audioBuffer;
+      // Apply 30% slower playback rate
+      source.playbackRate.value = 0.7;
+      source.connect(audioContext.destination);
+      
+      return new Promise<void>((resolve) => {
+        source.onended = () => {
+          resolve();
+        };
+        source.start(0);
+      });
+    } catch (e) {
+      console.error('TTS error:', e);
+    }
+  };
+
+  const processTTSQueue = async () => {
+    if (isTTSPlayingRef.current) return;
+    if (ttsQueueRef.current.length === 0) return;
+    
+    isTTSPlayingRef.current = true;
+    
+    while (ttsQueueRef.current.length > 0) {
+      const text = ttsQueueRef.current.shift();
+      if (text) {
+        await speakText(text);
+      }
+    }
+    
+    isTTSPlayingRef.current = false;
+  };
+
+  const queueTextForTTS = (char: string) => {
+    ttsBufferRef.current += char;
+    
+    // Check for sentence endings or good break points
+    const endPunctuation = ['.', '!', '?', ':', ';', '\n'];
+    const pausePunctuation = [','];
+    
+    // Split on sentence endings
+    if (endPunctuation.includes(char)) {
+      const textToSpeak = ttsBufferRef.current.trim();
+      if (textToSpeak.length > 0) {
+        ttsQueueRef.current.push(textToSpeak);
+        ttsBufferRef.current = "";
+        processTTSQueue();
+      }
+    }
+    // For very long buffers without punctuation, split at reasonable length
+    else if (ttsBufferRef.current.length > 150 && (char === ' ' || pausePunctuation.includes(char))) {
+      const textToSpeak = ttsBufferRef.current.trim();
+      if (textToSpeak.length > 0) {
+        ttsQueueRef.current.push(textToSpeak);
+        ttsBufferRef.current = "";
+        processTTSQueue();
+      }
+    }
+  };
 
   // --- Persistence & Init ---
 
@@ -651,6 +767,9 @@ const App = () => {
       if (processed < buffer.length) {
         const char = buffer[processed];
         processedCharCountRef.current += 1;
+
+        // Queue character for TTS
+        queueTextForTTS(char);
 
         setPages(prevPages => {
           const newPages = [...prevPages];
