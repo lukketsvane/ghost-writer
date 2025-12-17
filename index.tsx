@@ -384,6 +384,10 @@ const App = () => {
     if (!audioContextRef.current) {
       audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
     }
+    // Resume if suspended (browser autoplay policy)
+    if (audioContextRef.current.state === 'suspended') {
+      audioContextRef.current.resume();
+    }
     return audioContextRef.current;
   };
 
@@ -408,8 +412,6 @@ const App = () => {
               style: 0.0,
               use_speaker_boost: true
             },
-            // 30% slower than normal (speed 1.0 is normal, 0.7 is 30% slower)
-            // ElevenLabs uses speed where lower = slower
           }),
         }
       );
@@ -425,7 +427,7 @@ const App = () => {
       
       const source = audioContext.createBufferSource();
       source.buffer = audioBuffer;
-      // Apply 30% slower playback rate
+      // Apply 30% slower playback rate (0.7 = 30% slower than normal 1.0)
       source.playbackRate.value = 0.7;
       source.connect(audioContext.destination);
       
@@ -707,6 +709,9 @@ const App = () => {
   const startBook = async () => {
     if (!startSeed.trim()) return;
     setIsStarted(true);
+    
+    // Initialize AudioContext on user interaction to comply with browser autoplay policies
+    initAudioContext();
     
     const initialPage: PageData = {
       id: 7,
