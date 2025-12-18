@@ -646,28 +646,6 @@ const StepDisplay = styled.span`
   text-align: center;
 `;
 
-const DrawingCanvas = styled.canvas<{ $visible: boolean }>`
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  cursor: crosshair;
-  display: ${props => props.$visible ? 'block' : 'none'};
-  z-index: 100;
-`;
-
-const DrawingOverlay = styled.div<{ $visible: boolean }>`
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  display: ${props => props.$visible ? 'block' : 'none'};
-  z-index: 99;
-  background: rgba(255, 255, 255, 0.95);
-`;
-
 // --- Logic ---
 
 type LayoutType = 'text-only' | 'image-top' | 'image-bottom';
@@ -713,12 +691,6 @@ const App = () => {
   const [draftInput, setDraftInput] = useState("");
   const hiddenInputRef = useRef<HTMLTextAreaElement>(null);
 
-  // Drawing States
-  const [isDrawingMode, setIsDrawingMode] = useState(false);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const drawingDataRef = useRef<string | null>(null);
-
   // Page Turn States
   const [isFlipping, setIsFlipping] = useState(false);
   const [flipDirection, setFlipDirection] = useState<'forward' | 'backward'>('forward');
@@ -761,7 +733,6 @@ const App = () => {
   const isFetchingRef = useRef(false);
 
   const touchStartRef = useRef<number | null>(null);
-  const holdTimerRef = useRef<number | null>(null);
 
   // Tap detection refs
   const lastTapRef = useRef(0);
@@ -1175,163 +1146,6 @@ const App = () => {
     chatSessionRef.current = null;
   };
 
-  // --- Drawing Handlers ---
-
-  const toggleDrawingMode = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    const newMode = !isDrawingMode;
-    setIsDrawingMode(newMode);
-
-    if (newMode && canvasRef.current) {
-      const canvas = canvasRef.current;
-      const rect = canvas.getBoundingClientRect();
-      canvas.width = rect.width * 2; // High DPI
-      canvas.height = rect.height * 2;
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.scale(2, 2);
-        ctx.strokeStyle = '#000';
-        ctx.lineWidth = 2.5;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-      }
-    } else if (!newMode && canvasRef.current) {
-      const ctx = canvasRef.current.getContext('2d');
-      if (ctx) {
-        ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-      }
-    }
-  };
-
-  const getCanvasCoordinates = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!canvasRef.current) return null;
-    const canvas = canvasRef.current;
-    const rect = canvas.getBoundingClientRect();
-
-    let clientX: number, clientY: number;
-    if ('touches' in e) {
-      if (e.touches.length === 0) return null;
-      clientX = e.touches[0].clientX;
-      clientY = e.touches[0].clientY;
-    } else {
-      clientX = e.clientX;
-      clientY = e.clientY;
-    }
-
-    return {
-      x: clientX - rect.left,
-      y: clientY - rect.top
-    };
-  };
-
-  const addWobble = (x: number, y: number) => {
-    const wobbleAmount = 0.5;
-    return {
-      x: x + (Math.random() - 0.5) * wobbleAmount,
-      y: y + (Math.random() - 0.5) * wobbleAmount
-    };
-  };
-
-  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!isDrawingMode) return;
-    e.preventDefault();
-
-    // Start hold timer for cancel
-    holdTimerRef.current = window.setTimeout(() => {
-      setIsDrawingMode(false);
-      setIsDrawing(false);
-      if (canvasRef.current) {
-        const ctx = canvasRef.current.getContext('2d');
-        if (ctx) {
-          ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-        }
-      }
-    }, 800);
-
-    const coords = getCanvasCoordinates(e);
-    if (!coords) return;
-
-    setIsDrawing(true);
-    const ctx = canvasRef.current?.getContext('2d');
-    if (ctx) {
-      const wobbled = addWobble(coords.x, coords.y);
-      ctx.beginPath();
-      ctx.moveTo(wobbled.x, wobbled.y);
-    }
-  };
-
-  const draw = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!isDrawing || !isDrawingMode) return;
-    e.preventDefault();
-
-    // Clear hold timer since we're moving
-    if (holdTimerRef.current) {
-      clearTimeout(holdTimerRef.current);
-      holdTimerRef.current = null;
-    }
-
-    const coords = getCanvasCoordinates(e);
-    if (!coords) return;
-
-    const ctx = canvasRef.current?.getContext('2d');
-    if (ctx) {
-      const wobbled = addWobble(coords.x, coords.y);
-      ctx.lineTo(wobbled.x, wobbled.y);
-      ctx.stroke();
-    }
-  };
-
-  const endDrawing = (e: React.MouseEvent | React.TouchEvent) => {
-    if (!isDrawingMode) return;
-    e.preventDefault();
-
-    // Clear hold timer
-    if (holdTimerRef.current) {
-      clearTimeout(holdTimerRef.current);
-      holdTimerRef.current = null;
-    }
-
-    setIsDrawing(false);
-
-    // Check for horizontal stroke over title area to submit
-    if ('changedTouches' in e && e.changedTouches.length > 0) {
-      const touch = e.changedTouches[0];
-      const rect = canvasRef.current?.getBoundingClientRect();
-      if (rect) {
-        const y = touch.clientY - rect.top;
-        const headerHeight = rect.height * 0.08; // Approximate header area
-
-        if (y < headerHeight * 2) {
-          // Horizontal stroke detected in title area
-          submitDrawing();
-        }
-      }
-    }
-  };
-
-  const submitDrawing = async () => {
-    if (!canvasRef.current) return;
-
-    const dataUrl = canvasRef.current.toDataURL('image/png');
-    drawingDataRef.current = dataUrl;
-
-    setIsDrawingMode(false);
-    setIsDrawing(false);
-
-    // Clear canvas
-    const ctx = canvasRef.current.getContext('2d');
-    if (ctx) {
-      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
-    }
-
-    // Convert drawing to text prompt using AI
-    streamBufferRef.current += " [tegning mottatt] ";
-    setIsWaitingForInput(false);
-    setCurrentStep(0);
-
-    await fetchMoreText("(Brukeren har sendt en tegning. Beskriv hva du ser, eller la det inspirere teksten videre.)");
-  };
-
   // --- Page Turn Handlers ---
 
   const handleCornerDrag = (
@@ -1470,46 +1284,29 @@ const App = () => {
           <BookBase />
           <BookThickness />
           <PageWrapper>
-            <DrawingOverlay $visible={isDrawingMode} />
-            <DrawingCanvas
-              ref={canvasRef}
-              $visible={isDrawingMode}
-              onMouseDown={startDrawing}
-              onMouseMove={draw}
-              onMouseUp={endDrawing}
-              onMouseLeave={endDrawing}
-              onTouchStart={startDrawing}
-              onTouchMove={draw}
-              onTouchEnd={endDrawing}
-            />
-
             <PageHeader>
               <StepCounter>
                 <StepButton onClick={decrementSteps}>−</StepButton>
                 <StepDisplay>{maxSteps}</StepDisplay>
                 <StepButton onClick={incrementSteps}>+</StepButton>
               </StepCounter>
-              <HeaderTitle onClick={toggleDrawingMode} style={{ cursor: 'pointer' }}>
-                {isDrawingMode ? 'TEGN HER' : 'Etterlatte fragmenter'}
-              </HeaderTitle>
+              <HeaderTitle>Etterlatte fragmenter</HeaderTitle>
             </PageHeader>
 
-            {!isDrawingMode && (
-              <div style={{flex: 1, display: 'flex', flexDirection: 'column'}}>
-                <StartInput
-                  value={startSeed}
-                  onChange={e => setStartSeed(e.target.value)}
-                  placeholder="Skriv her..."
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      startBook();
-                    }
-                  }}
-                />
-              </div>
-            )}
+            <div style={{flex: 1, display: 'flex', flexDirection: 'column'}}>
+              <StartInput
+                value={startSeed}
+                onChange={e => setStartSeed(e.target.value)}
+                placeholder="Skriv her..."
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    startBook();
+                  }
+                }}
+              />
+            </div>
           </PageWrapper>
         </BookContainer>
       </AppContainer>
