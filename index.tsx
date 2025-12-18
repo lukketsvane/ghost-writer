@@ -156,6 +156,7 @@ const BookContainer = styled.div`
   aspect-ratio: 2 / 3;
   height: min(92vh, calc(92vw * (3 / 2)));
   width: min(92vw, calc(92vh * (2 / 3)));
+  transition: transform 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
 `;
 
 const BookBase = styled.div`
@@ -163,12 +164,13 @@ const BookBase = styled.div`
   width: 100%;
   height: 100%;
   transform-style: preserve-3d;
-  transform: translateZ(-20px);
-  background: linear-gradient(to right, #d0d0d0 0%, #e8e8e8 50%, #d0d0d0 100%);
-  border-radius: 2px;
+  transform: translateZ(-30px);
+  background: linear-gradient(to right, #b8b8b8 0%, #d8d8d8 50%, #b8b8b8 100%);
+  border-radius: 3px;
   box-shadow:
-    0 0 0 1px rgba(0,0,0,0.1),
-    0 30px 60px rgba(0,0,0,0.5);
+    0 0 0 1px rgba(0,0,0,0.15),
+    0 40px 80px rgba(0,0,0,0.6),
+    inset 0 0 20px rgba(0,0,0,0.1);
 `;
 
 const BookThickness = styled.div`
@@ -183,16 +185,17 @@ const BookThickness = styled.div`
     width: 100%;
     height: 100%;
     background: linear-gradient(to right, #c0c0c0, #e0e0e0, #c0c0c0);
+    box-shadow: inset 0 0 10px rgba(0,0,0,0.05);
   }
 
   &::before {
-    transform: translateZ(-15px);
-    opacity: 0.9;
+    transform: translateZ(-22px);
+    opacity: 0.95;
   }
 
   &::after {
-    transform: translateZ(-10px);
-    opacity: 0.95;
+    transform: translateZ(-15px);
+    opacity: 0.97;
   }
 `;
 
@@ -201,10 +204,10 @@ const PageWrapper = styled(motion.div)`
   width: 100%;
   height: 100%;
   background-color: #ffffff;
-  border-radius: 2px;
+  border-radius: 3px;
   box-shadow:
-    0 0 0 1px rgba(0,0,0,0.05),
-    0 10px 40px rgba(0,0,0,0.3);
+    0 0 0 1px rgba(0,0,0,0.08),
+    0 15px 50px rgba(0,0,0,0.35);
 
   transform-style: preserve-3d;
   transform-origin: left center;
@@ -216,6 +219,39 @@ const PageWrapper = styled(motion.div)`
   flex-direction: column;
   padding: 6cqw 8cqw 10cqw 8cqw;
   overflow: hidden;
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(
+      to right,
+      rgba(0,0,0,0.02) 0%,
+      transparent 5%,
+      transparent 95%,
+      rgba(0,0,0,0.02) 100%
+    );
+    pointer-events: none;
+  }
+`;
+
+const PageBackside = styled(motion.div)`
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background-color: #f8f8f8;
+  border-radius: 3px;
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,0.08),
+    0 15px 50px rgba(0,0,0,0.25);
+
+  transform-style: preserve-3d;
+  transform: rotateY(180deg);
+  backface-visibility: hidden;
+  pointer-events: none;
 `;
 
 const PageShine = styled(motion.div)`
@@ -225,40 +261,58 @@ const PageShine = styled(motion.div)`
   width: 100%;
   height: 100%;
   background: linear-gradient(
-    120deg,
+    135deg,
     transparent 0%,
-    transparent 40%,
-    rgba(255,255,255,0.6) 50%,
-    transparent 60%,
+    transparent 45%,
+    rgba(255,255,255,0.5) 50%,
+    transparent 55%,
     transparent 100%
   );
   pointer-events: none;
   z-index: 10;
-  mix-blend-mode: overlay;
+  mix-blend-mode: soft-light;
 `;
 
 const PageShadow = styled(motion.div)`
   position: absolute;
   top: 0;
   left: 0;
-  width: 15%;
+  width: 20%;
   height: 100%;
   background: linear-gradient(
     to right,
-    rgba(0,0,0,0.4) 0%,
-    rgba(0,0,0,0.1) 50%,
+    rgba(0,0,0,0.5) 0%,
+    rgba(0,0,0,0.2) 30%,
+    rgba(0,0,0,0.05) 70%,
     transparent 100%
   );
   pointer-events: none;
   z-index: 9;
 `;
 
-const CornerHitbox = styled.div`
+const PageCurlShadow = styled(motion.div)`
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 100px;
+  height: 100%;
+  background: linear-gradient(
+    to left,
+    rgba(0,0,0,0.3) 0%,
+    rgba(0,0,0,0.15) 50%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 8;
+  transform-origin: right center;
+`;
+
+const CornerHitbox = styled.div<{ $left?: boolean }>`
   position: absolute;
   bottom: 0;
-  right: 0;
-  width: 20cqw;
-  height: 20cqw;
+  ${props => props.$left ? 'left: 0;' : 'right: 0;'}
+  width: 22cqw;
+  height: 22cqw;
   cursor: grab;
   z-index: 50;
 
@@ -270,17 +324,20 @@ const CornerHitbox = styled.div`
     content: '';
     position: absolute;
     bottom: 2cqw;
-    right: 2cqw;
-    width: 4cqw;
-    height: 4cqw;
-    border-right: 2px solid rgba(0,0,0,0.15);
-    border-bottom: 2px solid rgba(0,0,0,0.15);
-    border-bottom-right-radius: 3px;
-    transition: opacity 0.3s;
+    ${props => props.$left ? 'left: 2cqw;' : 'right: 2cqw;'}
+    width: 5cqw;
+    height: 5cqw;
+    ${props => props.$left
+      ? 'border-left: 2px solid rgba(0,0,0,0.12); border-bottom: 2px solid rgba(0,0,0,0.12); border-bottom-left-radius: 4px;'
+      : 'border-right: 2px solid rgba(0,0,0,0.12); border-bottom: 2px solid rgba(0,0,0,0.12); border-bottom-right-radius: 4px;'}
+    transition: all 0.3s ease;
+    opacity: 0.5;
   }
 
   &:hover::before {
-    border-color: rgba(0,0,0,0.3);
+    border-color: rgba(0,0,0,0.35);
+    opacity: 1;
+    ${props => props.$left ? 'left: 1.5cqw;' : 'right: 1.5cqw;'}
   }
 `;
 
@@ -540,12 +597,37 @@ const App = () => {
 
   // Page Turn States
   const [isFlipping, setIsFlipping] = useState(false);
+  const [flipDirection, setFlipDirection] = useState<'forward' | 'backward'>('forward');
   const pageTurnProgress = useMotionValue(0);
-  const pageRotateY = useTransform(pageTurnProgress, [0, 1], [0, -180]);
-  const pageSkewY = useTransform(pageTurnProgress, [0, 0.5, 1], [0, -5, 0]);
-  const pageScale = useTransform(pageTurnProgress, [0, 0.5, 1], [1, 1.02, 1]);
-  const shineOpacity = useTransform(pageTurnProgress, [0, 0.3, 0.7, 1], [0, 0.8, 0.8, 0]);
-  const shadowOpacity = useTransform(pageTurnProgress, [0, 0.5, 1], [0, 1, 0.3]);
+  const pageRotateY = useMotionValue(0);
+  const bookRotateY = useMotionValue(0);
+
+  // Static transforms
+  const pageSkewY = useTransform(pageTurnProgress, [0, 0.5, 1], [0, -4, 0]);
+  const pageScale = useTransform(pageTurnProgress, [0, 0.5, 1], [1, 1.03, 1]);
+  const pageLift = useTransform(pageTurnProgress, [0, 0.5, 1], [0, 15, 0]);
+
+  // Enhanced lighting
+  const shineOpacity = useTransform(pageTurnProgress, [0, 0.2, 0.5, 0.8, 1], [0, 0.6, 1, 0.6, 0]);
+  const shadowOpacity = useTransform(pageTurnProgress, [0, 0.3, 0.7, 1], [0, 0.8, 1, 0.4]);
+  const curlShadowOpacity = useTransform(pageTurnProgress, [0, 0.3, 0.7, 1], [0, 1, 1, 0]);
+  const curlShadowScale = useTransform(pageTurnProgress, [0, 0.5, 1], [1, 1.5, 1]);
+
+  // Update rotation based on progress and direction
+  useEffect(() => {
+    const unsubscribe = pageTurnProgress.on('change', (progress) => {
+      const rotation = flipDirection === 'forward' ? progress * -180 : progress * 180;
+      pageRotateY.set(rotation);
+
+      const midRotation = flipDirection === 'forward' ? -3 : 3;
+      const bookRot = progress < 0.5
+        ? (progress * 2) * midRotation
+        : ((1 - progress) * 2) * midRotation;
+      bookRotateY.set(bookRot);
+    });
+
+    return () => unsubscribe();
+  }, [flipDirection, pageTurnProgress, pageRotateY, bookRotateY]);
 
   // Refs
   const chatSessionRef = useRef<Chat | null>(null);
@@ -1115,52 +1197,71 @@ const App = () => {
 
   // --- Page Turn Handlers ---
 
-  const handleCornerDrag = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+  const handleCornerDrag = (
+    event: MouseEvent | TouchEvent | PointerEvent,
+    info: PanInfo,
+    direction: 'forward' | 'backward'
+  ) => {
     if (isFlipping) return;
 
     const dragDistance = Math.abs(info.offset.x);
-    const maxDrag = 300;
+    const maxDrag = 280;
     const progress = Math.min(dragDistance / maxDrag, 1);
 
-    pageTurnProgress.set(progress);
+    // Apply easing to drag for more natural feel
+    const easedProgress = Math.sin(progress * Math.PI / 2);
+
+    pageTurnProgress.set(easedProgress);
   };
 
-  const handleCornerDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+  const handleCornerDragEnd = async (
+    event: MouseEvent | TouchEvent | PointerEvent,
+    info: PanInfo,
+    direction: 'forward' | 'backward'
+  ) => {
     const dragDistance = Math.abs(info.offset.x);
     const velocity = Math.abs(info.velocity.x);
+    const currentProgress = pageTurnProgress.get();
 
-    // Threshold for completing the page turn
-    const shouldTurn = dragDistance > 150 || velocity > 500;
+    // Velocity-based threshold for more natural interaction
+    const velocityBoost = Math.min(velocity / 1000, 0.3);
+    const shouldTurn = currentProgress + velocityBoost > 0.5 || dragDistance > 120;
 
-    if (shouldTurn && currentPageIndex < pages.length - 1) {
+    const canGoForward = direction === 'forward' && currentPageIndex < pages.length - 1;
+    const canGoBack = direction === 'backward' && currentPageIndex > 0;
+
+    if (shouldTurn && (canGoForward || canGoBack)) {
       setIsFlipping(true);
-      // Animate to completion
-      const animation = pageTurnProgress.get();
-      const remaining = 1 - animation;
 
-      // Spring animation to complete the turn
-      const interval = setInterval(() => {
-        const current = pageTurnProgress.get();
-        if (current >= 0.99) {
-          clearInterval(interval);
+      // Use framer-motion's animate for smooth spring physics
+      const { animate } = await import('framer-motion');
+
+      animate(pageTurnProgress, 1, {
+        type: 'spring',
+        stiffness: 150,
+        damping: 25,
+        mass: 0.8,
+        velocity: info.velocity.x / 100,
+        onComplete: () => {
           pageTurnProgress.set(0);
-          setCurrentPageIndex(prev => prev + 1);
+          if (direction === 'forward') {
+            setCurrentPageIndex(prev => prev + 1);
+          } else {
+            setCurrentPageIndex(prev => prev - 1);
+          }
           setIsFlipping(false);
-        } else {
-          pageTurnProgress.set(current + remaining * 0.15);
         }
-      }, 16);
+      });
     } else {
-      // Spring back
-      const interval = setInterval(() => {
-        const current = pageTurnProgress.get();
-        if (current <= 0.01) {
-          clearInterval(interval);
-          pageTurnProgress.set(0);
-        } else {
-          pageTurnProgress.set(current * 0.8);
-        }
-      }, 16);
+      // Spring back with natural bounce
+      const { animate } = await import('framer-motion');
+
+      animate(pageTurnProgress, 0, {
+        type: 'spring',
+        stiffness: 200,
+        damping: 20,
+        mass: 0.5
+      });
     }
   };
 
@@ -1292,7 +1393,10 @@ const App = () => {
           autoComplete="off"
         />
 
-        <BookContainer>
+        <BookContainer
+          as={motion.div}
+          style={{ rotateY: bookRotateY }}
+        >
           <BookBase />
           <BookThickness />
 
@@ -1301,10 +1405,19 @@ const App = () => {
               rotateY: pageRotateY,
               skewY: pageSkewY,
               scale: pageScale,
+              translateZ: pageLift,
             }}
           >
+            <PageBackside />
+
             <PageShadow style={{ opacity: shadowOpacity }} />
             <PageShine style={{ opacity: shineOpacity }} />
+            <PageCurlShadow
+              style={{
+                opacity: curlShadowOpacity,
+                scaleX: curlShadowScale,
+              }}
+            />
 
             <PageHeader>
               <HeaderNumber>{activePage.id}</HeaderNumber>
@@ -1339,14 +1452,34 @@ const App = () => {
               )}
             </ContentGrid>
 
+            {/* Forward page turn */}
             {currentPageIndex < pages.length - 1 && !isFlipping && (
               <CornerHitbox
                 as={motion.div}
                 drag="x"
-                dragConstraints={{ left: -300, right: 0 }}
-                dragElastic={0.2}
-                onDrag={handleCornerDrag}
-                onDragEnd={handleCornerDragEnd}
+                dragConstraints={{ left: -280, right: 0 }}
+                dragElastic={0.15}
+                onDrag={(e, info) => {
+                  setFlipDirection('forward');
+                  handleCornerDrag(e, info, 'forward');
+                }}
+                onDragEnd={(e, info) => handleCornerDragEnd(e, info, 'forward')}
+              />
+            )}
+
+            {/* Backward page turn */}
+            {currentPageIndex > 0 && !isFlipping && (
+              <CornerHitbox
+                $left
+                as={motion.div}
+                drag="x"
+                dragConstraints={{ left: 0, right: 280 }}
+                dragElastic={0.15}
+                onDrag={(e, info) => {
+                  setFlipDirection('backward');
+                  handleCornerDrag(e, info, 'backward');
+                }}
+                onDragEnd={(e, info) => handleCornerDragEnd(e, info, 'backward')}
               />
             )}
           </PageWrapper>
