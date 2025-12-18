@@ -311,7 +311,51 @@ const HiddenInput = styled.textarea`
   left: 0;
   height: 1px;
   width: 1px;
-  pointer-events: none; 
+  pointer-events: none;
+`;
+
+const StepCounter = styled.div`
+  position: absolute;
+  top: 2cqw;
+  left: 2cqw;
+  display: flex;
+  align-items: center;
+  gap: 1.5cqw;
+  font-family: 'EB Garamond', serif;
+  font-size: 2.5cqw;
+  color: #666;
+  z-index: 10;
+`;
+
+const StepButton = styled.button`
+  background: transparent;
+  border: 1px solid #999;
+  color: #666;
+  width: 4cqw;
+  height: 4cqw;
+  cursor: pointer;
+  font-family: 'EB Garamond', serif;
+  font-size: 2cqw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+
+  &:hover {
+    background: #f5f5f5;
+    border-color: #666;
+  }
+
+  &:active {
+    background: #e0e0e0;
+  }
+`;
+
+const StepDisplay = styled.span`
+  font-weight: 600;
+  color: #000;
+  min-width: 3cqw;
+  text-align: center;
 `;
 
 // --- Logic ---
@@ -341,11 +385,15 @@ const LAYOUTS: LayoutType[] = [
 const App = () => {
   const [hasApiKey, setHasApiKey] = useState(false);
   const [startSeed, setStartSeed] = useState("");
-  
+
   const [pages, setPages] = useState<PageData[]>([]);
   const [isStarted, setIsStarted] = useState(false);
-  
+
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
+
+  // Step Counter States
+  const [maxSteps, setMaxSteps] = useState(3);
+  const [currentStep, setCurrentStep] = useState(0);
 
   // Interaction States
   const [isWaitingForInput, setIsWaitingForInput] = useState(false);
@@ -620,13 +668,20 @@ const App = () => {
       const genIndex = generationPageIndexRef.current;
       const targetPage = pages[genIndex];
 
-      if (!targetPage) return; 
+      if (!targetPage) return;
 
       const buffer = streamBufferRef.current;
       const processed = processedCharCountRef.current;
 
       // --- Stop & Pulse Logic ---
       if (!isFetchingRef.current && processed >= buffer.length) {
+         // Check if we should auto-prompt
+         if (currentStep < maxSteps) {
+           setCurrentStep(prev => prev + 1);
+           fetchMoreText("(Fortsett. Skriv videre i samme stil og stemning.)");
+           return;
+         }
+
          if (!isWaitingForInput) {
            setIsWaitingForInput(true);
          }
@@ -691,7 +746,7 @@ const App = () => {
     }, TYPING_SPEED);
 
     return () => clearInterval(interval);
-  }, [isStarted, currentPageIndex, pages, isWaitingForInput]); 
+  }, [isStarted, currentPageIndex, pages, isWaitingForInput, currentStep, maxSteps]); 
 
   // --- Interaction Handlers ---
 
@@ -731,13 +786,26 @@ const App = () => {
 
       const input = draftInput;
       setDraftInput("");
-      
-      streamBufferRef.current += " " + input; 
-      
+
+      streamBufferRef.current += " " + input;
+
       setIsWaitingForInput(false);
-      
+      setCurrentStep(0); // Reset step counter when user manually inputs
+
       await fetchMoreText(input);
     }
+  };
+
+  // --- Step Counter Handlers ---
+
+  const incrementSteps = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMaxSteps(prev => Math.min(prev + 1, 10));
+  };
+
+  const decrementSteps = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMaxSteps(prev => Math.max(prev - 1, 1));
   };
 
   // --- Touch Navigation ---
@@ -752,7 +820,7 @@ const App = () => {
     const diff = touchStartRef.current - touchEnd;
 
     if (Math.abs(diff) < 10) {
-      handlePageTap(); 
+      handlePageTap();
     } else {
       if (diff > 50 && currentPageIndex < pages.length - 1) {
         setCurrentPageIndex(prev => prev + 1);
@@ -842,6 +910,13 @@ const App = () => {
         />
 
         <PageWrapper>
+          <StepCounter>
+            <StepButton onClick={decrementSteps}>−</StepButton>
+            <StepDisplay>{maxSteps}</StepDisplay>
+            <StepButton onClick={incrementSteps}>+</StepButton>
+            <span style={{ fontSize: '2cqw', color: '#999' }}>steg</span>
+          </StepCounter>
+
           <PageHeader>
             <HeaderNumber>{activePage.id}</HeaderNumber>
             <HeaderTitle>Stein og Speil</HeaderTitle>
