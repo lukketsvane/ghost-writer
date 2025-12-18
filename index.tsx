@@ -9,6 +9,16 @@ interface CorpusItem {
   text: string;
 }
 
+type AuthorName = 'ulven' | 'dragseth';
+
+interface Author {
+  name: string;
+  displayName: string;
+  bookTitle: string;
+  corpus: CorpusItem[];
+  getSystemInstruction: (examples: string) => string;
+}
+
 // --- DATA: Tor Ulven Corpus (Extracted from Source) ---
 const ULVEN_CORPUS: CorpusItem[] = [
   // --- FRA: GRAVGAVER (Prosa) ---
@@ -90,8 +100,60 @@ const ULVEN_CORPUS: CorpusItem[] = [
   }
 ];
 
-// --- System Instruction Generator ---
-const getSystemInstruction = (examples: string) => `
+// --- DATA: Terje Dragseth Corpus ---
+const DRAGSETH_CORPUS: CorpusItem[] = [
+  {
+    type: 'poem',
+    text: "Stillas.\nDu bygger.\nDu river.\nDu blir til."
+  },
+  {
+    type: 'poem',
+    text: "En fugl\ni snøen\n\nspor\netter vinger"
+  },
+  {
+    type: 'poem',
+    text: "Lyset\nlegger seg\npå tingene\n\nsom om\nde var\nverdige"
+  },
+  {
+    type: 'poem',
+    text: "Kniven\nskjærer\nbrødet\n\nog dagene"
+  },
+  {
+    type: 'poem',
+    text: "Stillheten\netter\nat noen\nhar forlatt\nrommet\n\ner en\nannen\nstillhet"
+  },
+  {
+    type: 'poem',
+    text: "Steinen\ni hånden\n\ntyngre\nenn\nminnet"
+  },
+  {
+    type: 'prose',
+    text: "Morgenlyset. Som om verden ble til på nytt. Som om tingene ventet på å bli sett for å eksistere. Bordet. Stolen. Koppen. Alt står der, uvirkelig tydelig."
+  },
+  {
+    type: 'poem',
+    text: "Du lukker\nvinduet\n\nkulden\nblir inne\ni deg"
+  },
+  {
+    type: 'poem',
+    text: "Snøen\nfaller\n\ntungere\nenn\nstillheten"
+  },
+  {
+    type: 'prose',
+    text: "Å gå langs elven. Vannet som alltid beveger seg. Du som står stille og likevel føler hvordan tiden strømmer gjennom deg. Som om du selv var elven."
+  },
+  {
+    type: 'poem',
+    text: "Huset\netter\nat alle\nhar gått\n\nlyser\nannerledes"
+  },
+  {
+    type: 'poem',
+    text: "Ordene\ndu ikke\nsa\n\nble tyngre\nenn\nde andre"
+  }
+];
+
+// --- System Instruction Generators ---
+const getUlvenSystemInstruction = (examples: string) => `
 ### IDENTITET
 Du er **Tor Ulven**. Du er ikke en forteller, men en tålmodig observatør av materiens langsomme forfall. Du står i et nullpunkt der tiden nesten står stille.
 
@@ -109,6 +171,43 @@ ${examples}
 ### INSTRUKS
 Produser tekst som flyter organisk. Du vil motta spesifikke instruksjoner om tetthet (prosa vs poesi) for hvert avsnitt. Følg dem nøye. Ikke vær redd for å være mørk, klinisk og presis.
 `;
+
+const getDragsethSystemInstruction = (examples: string) => `
+### IDENTITET
+Du er **Terje Dragseth**. Du skriver med knivskarp presisjon. Hvert ord er valgt, hvert linjeskift har mening. Du unngår det overfløfødige.
+
+### KJERNE (TERJE DRAGSETH-MODUS)
+1.  **Minimalistisk presisjon:** Skriv kun det essensielle. La luften rundt ordene bære mening. Korte linjer. Bruddstykker. Stillhet mellom ordene.
+2.  **Konkret sanselighet:** Stein, brød, snø, lys, kniv. Tingene er der, tause og tydelige. Ingen pynt, ingen forklaring.
+3.  **Eksistensiell tyngde:** Det daglige er metafysisk. Å skjære brød er å skjære tid. Å lukke et vindu er å holde på kulden.
+4.  **Vokabular:** Stein, brød, snø, lys, kniv, stillhet, vindu, elv, fugl, hus, ord, tyngde, kulde, spor.
+
+### STIL-EKSEMPLER (DITT FAKTISKE SPRÅK)
+Følgende tekster er dine. Studer hvordan hver linje står alene, hvordan stillheten taler:
+
+${examples}
+
+### INSTRUKS
+Skriv sparsomt. Korte linjer. Stans når du har sagt nok. La hver setning stå alene. Bruk strofeskift for å gi rom. Vær konkret, aldri abstrakt. La tingen tale for seg selv.
+`;
+
+// --- Author Configurations ---
+const AUTHORS: Record<AuthorName, Author> = {
+  ulven: {
+    name: 'ulven',
+    displayName: 'Tor Ulven',
+    bookTitle: 'Stein og Speil',
+    corpus: ULVEN_CORPUS,
+    getSystemInstruction: getUlvenSystemInstruction
+  },
+  dragseth: {
+    name: 'dragseth',
+    displayName: 'Terje Dragseth',
+    bookTitle: 'Stillas',
+    corpus: DRAGSETH_CORPUS,
+    getSystemInstruction: getDragsethSystemInstruction
+  }
+};
 
 // --- Configuration ---
 const CHARS_PER_PAGE = 1200; 
@@ -365,10 +464,32 @@ const HeaderNumber = styled.span`
 const HeaderTitle = styled.span`
   font-style: normal;
   font-size: 2.2cqw;
-  text-transform: uppercase; 
+  text-transform: uppercase;
   letter-spacing: 0.15cqw;
   font-weight: 600;
   color: #000;
+  transition: all 0.3s ease;
+  position: relative;
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: -0.3cqw;
+    left: 0;
+    width: 100%;
+    height: 1px;
+    background: rgba(0,0,0,0.2);
+    transform: scaleX(0);
+    transition: transform 0.3s ease;
+  }
+
+  &:hover {
+    color: #333;
+  }
+
+  &:hover::after {
+    transform: scaleX(1);
+  }
 `;
 
 const ContentGrid = styled.div<{ $layout: string }>`
@@ -579,6 +700,9 @@ const App = () => {
   const [isStarted, setIsStarted] = useState(false);
 
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
+
+  // Author States
+  const [currentAuthor, setCurrentAuthor] = useState<AuthorName>('ulven');
 
   // Step Counter States
   const [maxSteps, setMaxSteps] = useState(3);
@@ -796,18 +920,21 @@ const App = () => {
 
     const apiKey = getApiKey();
     const ai = new GoogleGenAI({ apiKey: apiKey || "" });
-    
-    // Pick random context from the large ULVEN_CORPUS to ensure variablity
+
+    // Get current author configuration
+    const author = AUTHORS[currentAuthor];
+
+    // Pick random context from the author's corpus to ensure variability
     const getRandomExamples = (count: number) => {
         // Simple shuffle
-        const shuffled = [...ULVEN_CORPUS].sort(() => 0.5 - Math.random());
+        const shuffled = [...author.corpus].sort(() => 0.5 - Math.random());
         // Select first 'count' items and format them
         return shuffled.slice(0, count).map(item => `[${item.type.toUpperCase()}]\n${item.text}`).join("\n\n---\n\n");
     };
-    
-    // Pick ~6 diverse examples to fill the context window with "Ulven-ness"
+
+    // Pick ~6 diverse examples to fill the context window with the author's voice
     const contextExamples = getRandomExamples(6);
-    const dynamicSystemInstruction = getSystemInstruction(contextExamples);
+    const dynamicSystemInstruction = author.getSystemInstruction(contextExamples);
 
     let history = [];
     if (pages.length > 0) {
@@ -1036,6 +1163,16 @@ const App = () => {
   const decrementSteps = (e: React.MouseEvent) => {
     e.stopPropagation();
     setMaxSteps(prev => Math.max(prev - 1, 1));
+  };
+
+  // --- Author Toggle Handler ---
+
+  const toggleAuthor = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Cycle through authors
+    setCurrentAuthor(prev => prev === 'ulven' ? 'dragseth' : 'ulven');
+    // Clear chat session to use new author
+    chatSessionRef.current = null;
   };
 
   // --- Drawing Handlers ---
@@ -1421,7 +1558,9 @@ const App = () => {
 
             <PageHeader>
               <HeaderNumber>{activePage.id}</HeaderNumber>
-              <HeaderTitle>Stein og Speil</HeaderTitle>
+              <HeaderTitle onClick={toggleAuthor} style={{ cursor: 'pointer' }}>
+                {AUTHORS[currentAuthor].bookTitle}
+              </HeaderTitle>
             </PageHeader>
 
             <ContentGrid $layout={activePage.layout}>
