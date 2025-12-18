@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { GoogleGenAI, Chat } from "@google/genai";
 import styled, { keyframes, css, createGlobalStyle } from 'styled-components';
+import { motion, useMotionValue, useTransform, PanInfo } from 'framer-motion';
 
 interface CorpusItem {
   type: 'prose' | 'poem';
@@ -143,31 +144,144 @@ const AppContainer = styled.div`
   align-items: center;
   height: 100vh;
   width: 100vw;
-  background-color: #111;
-  perspective: 1500px;
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+  perspective: 2000px;
+  perspective-origin: 50% 50%;
+  overflow: hidden;
 `;
 
-const PageWrapper = styled.div`
+const BookContainer = styled.div`
+  position: relative;
+  transform-style: preserve-3d;
   aspect-ratio: 2 / 3;
   height: min(92vh, calc(92vw * (3 / 2)));
   width: min(92vw, calc(92vh * (2 / 3)));
-  
+`;
+
+const BookBase = styled.div`
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transform: translateZ(-20px);
+  background: linear-gradient(to right, #d0d0d0 0%, #e8e8e8 50%, #d0d0d0 100%);
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,0.1),
+    0 30px 60px rgba(0,0,0,0.5);
+`;
+
+const BookThickness = styled.div`
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+
+  &::before, &::after {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(to right, #c0c0c0, #e0e0e0, #c0c0c0);
+  }
+
+  &::before {
+    transform: translateZ(-15px);
+    opacity: 0.9;
+  }
+
+  &::after {
+    transform: translateZ(-10px);
+    opacity: 0.95;
+  }
+`;
+
+const PageWrapper = styled(motion.div)`
+  position: absolute;
+  width: 100%;
+  height: 100%;
   background-color: #ffffff;
-  box-shadow: 
-    0 1px 1px rgba(0,0,0,0.15), 
-    0 10px 0 -5px #e0e0e0, 
-    0 10px 1px -4px rgba(0,0,0,0.15), 
-    0 20px 0 -10px #e0e0e0, 
-    0 20px 1px -9px rgba(0,0,0,0.15),
-    10px 10px 30px rgba(0,0,0,0.4);
-  
-  position: relative;
-  overflow: hidden;
+  border-radius: 2px;
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,0.05),
+    0 10px 40px rgba(0,0,0,0.3);
+
+  transform-style: preserve-3d;
+  transform-origin: left center;
+  backface-visibility: hidden;
+
   container-type: size;
-  
+
   display: flex;
   flex-direction: column;
-  padding: 6cqw 8cqw 10cqw 8cqw; 
+  padding: 6cqw 8cqw 10cqw 8cqw;
+  overflow: hidden;
+`;
+
+const PageShine = styled(motion.div)`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    120deg,
+    transparent 0%,
+    transparent 40%,
+    rgba(255,255,255,0.6) 50%,
+    transparent 60%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 10;
+  mix-blend-mode: overlay;
+`;
+
+const PageShadow = styled(motion.div)`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 15%;
+  height: 100%;
+  background: linear-gradient(
+    to right,
+    rgba(0,0,0,0.4) 0%,
+    rgba(0,0,0,0.1) 50%,
+    transparent 100%
+  );
+  pointer-events: none;
+  z-index: 9;
+`;
+
+const CornerHitbox = styled.div`
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 20cqw;
+  height: 20cqw;
+  cursor: grab;
+  z-index: 50;
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  &::before {
+    content: '';
+    position: absolute;
+    bottom: 2cqw;
+    right: 2cqw;
+    width: 4cqw;
+    height: 4cqw;
+    border-right: 2px solid rgba(0,0,0,0.15);
+    border-bottom: 2px solid rgba(0,0,0,0.15);
+    border-bottom-right-radius: 3px;
+    transition: opacity 0.3s;
+  }
+
+  &:hover::before {
+    border-color: rgba(0,0,0,0.3);
+  }
 `;
 
 const PageHeader = styled.div`
@@ -423,6 +537,15 @@ const App = () => {
   const [isDrawing, setIsDrawing] = useState(false);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawingDataRef = useRef<string | null>(null);
+
+  // Page Turn States
+  const [isFlipping, setIsFlipping] = useState(false);
+  const pageTurnProgress = useMotionValue(0);
+  const pageRotateY = useTransform(pageTurnProgress, [0, 1], [0, -180]);
+  const pageSkewY = useTransform(pageTurnProgress, [0, 0.5, 1], [0, -5, 0]);
+  const pageScale = useTransform(pageTurnProgress, [0, 0.5, 1], [1, 1.02, 1]);
+  const shineOpacity = useTransform(pageTurnProgress, [0, 0.3, 0.7, 1], [0, 0.8, 0.8, 0]);
+  const shadowOpacity = useTransform(pageTurnProgress, [0, 0.5, 1], [0, 1, 0.3]);
 
   // Refs
   const chatSessionRef = useRef<Chat | null>(null);
@@ -990,9 +1113,61 @@ const App = () => {
     await fetchMoreText("(Brukeren har sendt en tegning. Beskriv hva du ser, eller la det inspirere teksten videre.)");
   };
 
+  // --- Page Turn Handlers ---
+
+  const handleCornerDrag = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    if (isFlipping) return;
+
+    const dragDistance = Math.abs(info.offset.x);
+    const maxDrag = 300;
+    const progress = Math.min(dragDistance / maxDrag, 1);
+
+    pageTurnProgress.set(progress);
+  };
+
+  const handleCornerDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+    const dragDistance = Math.abs(info.offset.x);
+    const velocity = Math.abs(info.velocity.x);
+
+    // Threshold for completing the page turn
+    const shouldTurn = dragDistance > 150 || velocity > 500;
+
+    if (shouldTurn && currentPageIndex < pages.length - 1) {
+      setIsFlipping(true);
+      // Animate to completion
+      const animation = pageTurnProgress.get();
+      const remaining = 1 - animation;
+
+      // Spring animation to complete the turn
+      const interval = setInterval(() => {
+        const current = pageTurnProgress.get();
+        if (current >= 0.99) {
+          clearInterval(interval);
+          pageTurnProgress.set(0);
+          setCurrentPageIndex(prev => prev + 1);
+          setIsFlipping(false);
+        } else {
+          pageTurnProgress.set(current + remaining * 0.15);
+        }
+      }, 16);
+    } else {
+      // Spring back
+      const interval = setInterval(() => {
+        const current = pageTurnProgress.get();
+        if (current <= 0.01) {
+          clearInterval(interval);
+          pageTurnProgress.set(0);
+        } else {
+          pageTurnProgress.set(current * 0.8);
+        }
+      }, 16);
+    }
+  };
+
   // --- Touch Navigation ---
 
   const handleTouchStart = (e: React.TouchEvent) => {
+    if (isFlipping) return;
     touchStartRef.current = e.touches[0].clientX;
   };
 
@@ -1017,31 +1192,35 @@ const App = () => {
   if (!hasApiKey) {
     return (
       <AppContainer>
-        <PageWrapper>
-          <PageHeader>
-             <HeaderNumber>0</HeaderNumber>
-             <HeaderTitle>BEGRENSET TILGANG</HeaderTitle>
-          </PageHeader>
-          <div style={{flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center'}}>
-            <button 
-              style={{
-                background: 'transparent', 
-                border: '2px solid #000', 
-                color: '#000', 
-                padding: '1.5cqw 4cqw', 
-                cursor: 'pointer',
-                fontFamily: 'EB Garamond, serif',
-                fontSize: '2.5cqw',
-                fontWeight: 600,
-                textTransform: 'uppercase',
-                letterSpacing: '0.1cqw'
-              }} 
-              onClick={handleSelectKey}
-            >
-              Velg API-nøkkel
-            </button>
-          </div>
-        </PageWrapper>
+        <BookContainer>
+          <BookBase />
+          <BookThickness />
+          <PageWrapper>
+            <PageHeader>
+              <HeaderNumber>0</HeaderNumber>
+              <HeaderTitle>BEGRENSET TILGANG</HeaderTitle>
+            </PageHeader>
+            <div style={{flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center'}}>
+              <button
+                style={{
+                  background: 'transparent',
+                  border: '2px solid #000',
+                  color: '#000',
+                  padding: '1.5cqw 4cqw',
+                  cursor: 'pointer',
+                  fontFamily: 'EB Garamond, serif',
+                  fontSize: '2.5cqw',
+                  fontWeight: 600,
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.1cqw'
+                }}
+                onClick={handleSelectKey}
+              >
+                Velg API-nøkkel
+              </button>
+            </div>
+          </PageWrapper>
+        </BookContainer>
       </AppContainer>
     );
   }
@@ -1049,48 +1228,52 @@ const App = () => {
   if (!isStarted && pages.length === 0) {
     return (
       <AppContainer>
-        <PageWrapper>
-          <DrawingOverlay $visible={isDrawingMode} />
-          <DrawingCanvas
-            ref={canvasRef}
-            $visible={isDrawingMode}
-            onMouseDown={startDrawing}
-            onMouseMove={draw}
-            onMouseUp={endDrawing}
-            onMouseLeave={endDrawing}
-            onTouchStart={startDrawing}
-            onTouchMove={draw}
-            onTouchEnd={endDrawing}
-          />
+        <BookContainer>
+          <BookBase />
+          <BookThickness />
+          <PageWrapper>
+            <DrawingOverlay $visible={isDrawingMode} />
+            <DrawingCanvas
+              ref={canvasRef}
+              $visible={isDrawingMode}
+              onMouseDown={startDrawing}
+              onMouseMove={draw}
+              onMouseUp={endDrawing}
+              onMouseLeave={endDrawing}
+              onTouchStart={startDrawing}
+              onTouchMove={draw}
+              onTouchEnd={endDrawing}
+            />
 
-          <PageHeader>
-            <StepCounter>
-              <StepButton onClick={decrementSteps}>−</StepButton>
-              <StepDisplay>{maxSteps}</StepDisplay>
-              <StepButton onClick={incrementSteps}>+</StepButton>
-            </StepCounter>
-            <HeaderTitle onClick={toggleDrawingMode} style={{ cursor: 'pointer' }}>
-              {isDrawingMode ? 'TEGN HER' : 'Etterlatte fragmenter'}
-            </HeaderTitle>
-          </PageHeader>
+            <PageHeader>
+              <StepCounter>
+                <StepButton onClick={decrementSteps}>−</StepButton>
+                <StepDisplay>{maxSteps}</StepDisplay>
+                <StepButton onClick={incrementSteps}>+</StepButton>
+              </StepCounter>
+              <HeaderTitle onClick={toggleDrawingMode} style={{ cursor: 'pointer' }}>
+                {isDrawingMode ? 'TEGN HER' : 'Etterlatte fragmenter'}
+              </HeaderTitle>
+            </PageHeader>
 
-          {!isDrawingMode && (
-            <div style={{flex: 1, display: 'flex', flexDirection: 'column'}}>
-              <StartInput
-                value={startSeed}
-                onChange={e => setStartSeed(e.target.value)}
-                placeholder="Skriv her..."
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    startBook();
-                  }
-                }}
-              />
-            </div>
-          )}
-        </PageWrapper>
+            {!isDrawingMode && (
+              <div style={{flex: 1, display: 'flex', flexDirection: 'column'}}>
+                <StartInput
+                  value={startSeed}
+                  onChange={e => setStartSeed(e.target.value)}
+                  placeholder="Skriv her..."
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      startBook();
+                    }
+                  }}
+                />
+              </div>
+            )}
+          </PageWrapper>
+        </BookContainer>
       </AppContainer>
     );
   }
@@ -1100,12 +1283,8 @@ const App = () => {
   return (
     <>
       <GlobalStyle />
-      <AppContainer 
-        onTouchStart={handleTouchStart} 
-        onTouchEnd={handleTouchEnd}
-        onClick={handlePageTap}
-      >
-        <HiddenInput 
+      <AppContainer onClick={handlePageTap}>
+        <HiddenInput
           ref={hiddenInputRef}
           value={draftInput}
           onChange={handleInputChange}
@@ -1113,22 +1292,35 @@ const App = () => {
           autoComplete="off"
         />
 
-        <PageWrapper>
-          <PageHeader>
-            <HeaderNumber>{activePage.id}</HeaderNumber>
-            <HeaderTitle>Stein og Speil</HeaderTitle>
-          </PageHeader>
+        <BookContainer>
+          <BookBase />
+          <BookThickness />
 
-          <ContentGrid $layout={activePage.layout}>
-            {activePage.layout === 'image-top' && (
-               <FixedImageFrame>
-                 {activePage.imageUrl && (
+          <PageWrapper
+            style={{
+              rotateY: pageRotateY,
+              skewY: pageSkewY,
+              scale: pageScale,
+            }}
+          >
+            <PageShadow style={{ opacity: shadowOpacity }} />
+            <PageShine style={{ opacity: shineOpacity }} />
+
+            <PageHeader>
+              <HeaderNumber>{activePage.id}</HeaderNumber>
+              <HeaderTitle>Stein og Speil</HeaderTitle>
+            </PageHeader>
+
+            <ContentGrid $layout={activePage.layout}>
+              {activePage.layout === 'image-top' && (
+                <FixedImageFrame>
+                  {activePage.imageUrl && (
                     <Illustration src={activePage.imageUrl} $visible={activePage.imageVisible} />
-                 )}
-               </FixedImageFrame>
-            )}
+                  )}
+                </FixedImageFrame>
+              )}
 
-            <TextBody>
+              <TextBody>
                 {activePage.text}
                 {isWaitingForInput && currentPageIndex === pages.length - 1 && (
                   <>
@@ -1136,17 +1328,29 @@ const App = () => {
                     <PulsingPeriod>{draftInput.length > 0 ? '' : '.'}</PulsingPeriod>
                   </>
                 )}
-            </TextBody>
+              </TextBody>
 
-            {activePage.layout === 'image-bottom' && (
+              {activePage.layout === 'image-bottom' && (
                 <FixedImageFrame>
-                   {activePage.imageUrl && (
-                      <Illustration src={activePage.imageUrl} $visible={activePage.imageVisible} />
-                   )}
+                  {activePage.imageUrl && (
+                    <Illustration src={activePage.imageUrl} $visible={activePage.imageVisible} />
+                  )}
                 </FixedImageFrame>
+              )}
+            </ContentGrid>
+
+            {currentPageIndex < pages.length - 1 && !isFlipping && (
+              <CornerHitbox
+                as={motion.div}
+                drag="x"
+                dragConstraints={{ left: -300, right: 0 }}
+                dragElastic={0.2}
+                onDrag={handleCornerDrag}
+                onDragEnd={handleCornerDragEnd}
+              />
             )}
-          </ContentGrid>
-        </PageWrapper>
+          </PageWrapper>
+        </BookContainer>
 
         {pages.length > 1 && (
           <NavigationHint>
