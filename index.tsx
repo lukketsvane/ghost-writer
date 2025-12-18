@@ -203,7 +203,7 @@ const AUTHORS: Record<AuthorName, Author> = {
   dragseth: {
     name: 'dragseth',
     displayName: 'Terje Dragseth',
-    bookTitle: 'Stillas',
+    bookTitle: 'jeg-skriver-språket',
     corpus: DRAGSETH_CORPUS,
     getSystemInstruction: getDragsethSystemInstruction
   }
