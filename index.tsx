@@ -311,7 +311,69 @@ const HiddenInput = styled.textarea`
   left: 0;
   height: 1px;
   width: 1px;
-  pointer-events: none; 
+  pointer-events: none;
+`;
+
+const StepCounter = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 0.8cqw;
+  font-family: 'EB Garamond', serif;
+`;
+
+const StepButton = styled.button`
+  background: transparent;
+  border: 1px solid #999;
+  color: #666;
+  width: 3cqw;
+  height: 3cqw;
+  cursor: pointer;
+  font-family: 'EB Garamond', serif;
+  font-size: 1.8cqw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+  padding: 0;
+
+  &:hover {
+    background: #f5f5f5;
+    border-color: #666;
+  }
+
+  &:active {
+    background: #e0e0e0;
+  }
+`;
+
+const StepDisplay = styled.span`
+  font-weight: 700;
+  color: #000;
+  font-size: 3.5cqw;
+  min-width: 3cqw;
+  text-align: center;
+`;
+
+const DrawingCanvas = styled.canvas<{ $visible: boolean }>`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  display: ${props => props.$visible ? 'block' : 'none'};
+  z-index: 100;
+`;
+
+const DrawingOverlay = styled.div<{ $visible: boolean }>`
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: ${props => props.$visible ? 'block' : 'none'};
+  z-index: 99;
+  background: rgba(255, 255, 255, 0.95);
 `;
 
 // --- Logic ---
@@ -341,16 +403,26 @@ const LAYOUTS: LayoutType[] = [
 const App = () => {
   const [hasApiKey, setHasApiKey] = useState(false);
   const [startSeed, setStartSeed] = useState("");
-  
+
   const [pages, setPages] = useState<PageData[]>([]);
   const [isStarted, setIsStarted] = useState(false);
-  
+
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
+
+  // Step Counter States
+  const [maxSteps, setMaxSteps] = useState(3);
+  const [currentStep, setCurrentStep] = useState(0);
 
   // Interaction States
   const [isWaitingForInput, setIsWaitingForInput] = useState(false);
   const [draftInput, setDraftInput] = useState("");
   const hiddenInputRef = useRef<HTMLTextAreaElement>(null);
+
+  // Drawing States
+  const [isDrawingMode, setIsDrawingMode] = useState(false);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const drawingDataRef = useRef<string | null>(null);
 
   // Refs
   const chatSessionRef = useRef<Chat | null>(null);
@@ -358,9 +430,10 @@ const App = () => {
   const processedCharCountRef = useRef(0);
   const generationPageIndexRef = useRef(0);
   const isFetchingRef = useRef(false);
-  
+
   const touchStartRef = useRef<number | null>(null);
-  
+  const holdTimerRef = useRef<number | null>(null);
+
   // Tap detection refs
   const lastTapRef = useRef(0);
   const tapCountRef = useRef(0);
@@ -620,13 +693,20 @@ const App = () => {
       const genIndex = generationPageIndexRef.current;
       const targetPage = pages[genIndex];
 
-      if (!targetPage) return; 
+      if (!targetPage) return;
 
       const buffer = streamBufferRef.current;
       const processed = processedCharCountRef.current;
 
       // --- Stop & Pulse Logic ---
       if (!isFetchingRef.current && processed >= buffer.length) {
+         // Check if we should auto-prompt
+         if (currentStep < maxSteps) {
+           setCurrentStep(prev => prev + 1);
+           fetchMoreText("(Fortsett. Skriv videre i samme stil og stemning.)");
+           return;
+         }
+
          if (!isWaitingForInput) {
            setIsWaitingForInput(true);
          }
@@ -691,7 +771,7 @@ const App = () => {
     }, TYPING_SPEED);
 
     return () => clearInterval(interval);
-  }, [isStarted, currentPageIndex, pages, isWaitingForInput]); 
+  }, [isStarted, currentPageIndex, pages, isWaitingForInput, currentStep, maxSteps]); 
 
   // --- Interaction Handlers ---
 
@@ -731,13 +811,183 @@ const App = () => {
 
       const input = draftInput;
       setDraftInput("");
-      
-      streamBufferRef.current += " " + input; 
-      
+
+      streamBufferRef.current += " " + input;
+
       setIsWaitingForInput(false);
-      
+      setCurrentStep(0); // Reset step counter when user manually inputs
+
       await fetchMoreText(input);
     }
+  };
+
+  // --- Step Counter Handlers ---
+
+  const incrementSteps = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMaxSteps(prev => Math.min(prev + 1, 10));
+  };
+
+  const decrementSteps = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setMaxSteps(prev => Math.max(prev - 1, 1));
+  };
+
+  // --- Drawing Handlers ---
+
+  const toggleDrawingMode = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    const newMode = !isDrawingMode;
+    setIsDrawingMode(newMode);
+
+    if (newMode && canvasRef.current) {
+      const canvas = canvasRef.current;
+      const rect = canvas.getBoundingClientRect();
+      canvas.width = rect.width * 2; // High DPI
+      canvas.height = rect.height * 2;
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.scale(2, 2);
+        ctx.strokeStyle = '#000';
+        ctx.lineWidth = 2.5;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+      }
+    } else if (!newMode && canvasRef.current) {
+      const ctx = canvasRef.current.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+      }
+    }
+  };
+
+  const getCanvasCoordinates = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!canvasRef.current) return null;
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+
+    let clientX: number, clientY: number;
+    if ('touches' in e) {
+      if (e.touches.length === 0) return null;
+      clientX = e.touches[0].clientX;
+      clientY = e.touches[0].clientY;
+    } else {
+      clientX = e.clientX;
+      clientY = e.clientY;
+    }
+
+    return {
+      x: clientX - rect.left,
+      y: clientY - rect.top
+    };
+  };
+
+  const addWobble = (x: number, y: number) => {
+    const wobbleAmount = 0.5;
+    return {
+      x: x + (Math.random() - 0.5) * wobbleAmount,
+      y: y + (Math.random() - 0.5) * wobbleAmount
+    };
+  };
+
+  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDrawingMode) return;
+    e.preventDefault();
+
+    // Start hold timer for cancel
+    holdTimerRef.current = window.setTimeout(() => {
+      setIsDrawingMode(false);
+      setIsDrawing(false);
+      if (canvasRef.current) {
+        const ctx = canvasRef.current.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+        }
+      }
+    }, 800);
+
+    const coords = getCanvasCoordinates(e);
+    if (!coords) return;
+
+    setIsDrawing(true);
+    const ctx = canvasRef.current?.getContext('2d');
+    if (ctx) {
+      const wobbled = addWobble(coords.x, coords.y);
+      ctx.beginPath();
+      ctx.moveTo(wobbled.x, wobbled.y);
+    }
+  };
+
+  const draw = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDrawing || !isDrawingMode) return;
+    e.preventDefault();
+
+    // Clear hold timer since we're moving
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+
+    const coords = getCanvasCoordinates(e);
+    if (!coords) return;
+
+    const ctx = canvasRef.current?.getContext('2d');
+    if (ctx) {
+      const wobbled = addWobble(coords.x, coords.y);
+      ctx.lineTo(wobbled.x, wobbled.y);
+      ctx.stroke();
+    }
+  };
+
+  const endDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDrawingMode) return;
+    e.preventDefault();
+
+    // Clear hold timer
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+
+    setIsDrawing(false);
+
+    // Check for horizontal stroke over title area to submit
+    if ('changedTouches' in e && e.changedTouches.length > 0) {
+      const touch = e.changedTouches[0];
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (rect) {
+        const y = touch.clientY - rect.top;
+        const headerHeight = rect.height * 0.08; // Approximate header area
+
+        if (y < headerHeight * 2) {
+          // Horizontal stroke detected in title area
+          submitDrawing();
+        }
+      }
+    }
+  };
+
+  const submitDrawing = async () => {
+    if (!canvasRef.current) return;
+
+    const dataUrl = canvasRef.current.toDataURL('image/png');
+    drawingDataRef.current = dataUrl;
+
+    setIsDrawingMode(false);
+    setIsDrawing(false);
+
+    // Clear canvas
+    const ctx = canvasRef.current.getContext('2d');
+    if (ctx) {
+      ctx.clearRect(0, 0, canvasRef.current.width, canvasRef.current.height);
+    }
+
+    // Convert drawing to text prompt using AI
+    streamBufferRef.current += " [tegning mottatt] ";
+    setIsWaitingForInput(false);
+    setCurrentStep(0);
+
+    await fetchMoreText("(Brukeren har sendt en tegning. Beskriv hva du ser, eller la det inspirere teksten videre.)");
   };
 
   // --- Touch Navigation ---
@@ -752,7 +1002,7 @@ const App = () => {
     const diff = touchStartRef.current - touchEnd;
 
     if (Math.abs(diff) < 10) {
-      handlePageTap(); 
+      handlePageTap();
     } else {
       if (diff > 50 && currentPageIndex < pages.length - 1) {
         setCurrentPageIndex(prev => prev + 1);
@@ -800,24 +1050,46 @@ const App = () => {
     return (
       <AppContainer>
         <PageWrapper>
+          <DrawingOverlay $visible={isDrawingMode} />
+          <DrawingCanvas
+            ref={canvasRef}
+            $visible={isDrawingMode}
+            onMouseDown={startDrawing}
+            onMouseMove={draw}
+            onMouseUp={endDrawing}
+            onMouseLeave={endDrawing}
+            onTouchStart={startDrawing}
+            onTouchMove={draw}
+            onTouchEnd={endDrawing}
+          />
+
           <PageHeader>
-            <HeaderNumber>7</HeaderNumber>
-            <HeaderTitle>Etterlatte fragmenter</HeaderTitle>
+            <StepCounter>
+              <StepButton onClick={decrementSteps}>−</StepButton>
+              <StepDisplay>{maxSteps}</StepDisplay>
+              <StepButton onClick={incrementSteps}>+</StepButton>
+            </StepCounter>
+            <HeaderTitle onClick={toggleDrawingMode} style={{ cursor: 'pointer' }}>
+              {isDrawingMode ? 'TEGN HER' : 'Etterlatte fragmenter'}
+            </HeaderTitle>
           </PageHeader>
-          <div style={{flex: 1, display: 'flex', flexDirection: 'column'}}>
-            <StartInput 
-              value={startSeed} 
-              onChange={e => setStartSeed(e.target.value)} 
-              placeholder="Skriv her..."
-              autoFocus
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault();
-                  startBook();
-                }
-              }}
-            />
-          </div>
+
+          {!isDrawingMode && (
+            <div style={{flex: 1, display: 'flex', flexDirection: 'column'}}>
+              <StartInput
+                value={startSeed}
+                onChange={e => setStartSeed(e.target.value)}
+                placeholder="Skriv her..."
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    startBook();
+                  }
+                }}
+              />
+            </div>
+          )}
         </PageWrapper>
       </AppContainer>
     );
